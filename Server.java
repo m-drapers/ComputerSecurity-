@@ -1,19 +1,21 @@
 import java.net.*;
 import java.io.*;
-
+import java.util.HashMap;
+import java.util.Map;
 
 public class Server {
     private ServerSocket serverSocket;
+    private Map<String, ClientInfo> clients = new HashMap<>();
 
     public void start(int port) {
-        try{
-        serverSocket = new ServerSocket(port);
-        while (true)
-            new ClientHandler(serverSocket.accept()).start();
-        }
-        catch (IOException e) {
+        try {
+            serverSocket = new ServerSocket(port);
+            System.out.println("Server started on port " + port);
+            while (true)
+                new ClientHandler(serverSocket.accept()).start();
+        } catch (IOException e) {
             e.printStackTrace();
-        }   
+        }
     }
 
     public void stop() {
@@ -24,18 +26,32 @@ public class Server {
         }
     }
 
-    private static class ClientHandler extends Thread {
+    private class ClientInfo {
+        String id;
+        String password;
+        int counter;
+
+        ClientInfo(String id, String password, int counter) {
+            this.id = id;
+            this.password = password;
+            this.counter = counter;
+        }
+    }
+
+    private class ClientHandler extends Thread {
         private Socket clientSocket;
         private PrintWriter out;
         private BufferedReader in;
+        private String clientId;
 
         public ClientHandler(Socket socket) {
             this.clientSocket = socket;
         }
 
         public void run() {
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                 PrintWriter out = new PrintWriter(serverSocket.getOutputStream(), true)) {
+            try {
+                in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                out = new PrintWriter(clientSocket.getOutputStream(), true);
 
                 String message;
                 while ((message = in.readLine()) != null) {
@@ -63,21 +79,26 @@ public class Server {
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
-                handleLogout(null);
+                handleLogout(out);
                 try {
-                    socket.close();
+                    clientSocket.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
         }
-    
+
         private void handleRegister(PrintWriter out, String[] parts) {
+            if (parts.length < 3) {
+                out.println("ERROR: Invalid registration format.");
+                return;
+            }
+
             clientId = parts[1];
             String password = parts[2];
 
-            if (clients.containsKey(clientId) && !clients.get(clientId).password.equals(password)) {
-                out.println("ERROR: ID already registered with a different password.");
+            if (clients.containsKey(clientId)) {
+                out.println("ERROR: ID already registered.");
             } else {
                 clients.put(clientId, new ClientInfo(clientId, password, 0));
                 out.println("ACK: Registration successful.");
@@ -88,7 +109,6 @@ public class Server {
             ClientInfo clientInfo = clients.get(clientId);
             if (clientInfo != null) {
                 clientInfo.counter += amount;
-                logAction("INCREASE", clientId, clientInfo.counter);
                 out.println("Counter increased to " + clientInfo.counter);
             } else {
                 out.println("ERROR: Client not registered.");
@@ -99,7 +119,6 @@ public class Server {
             ClientInfo clientInfo = clients.get(clientId);
             if (clientInfo != null) {
                 clientInfo.counter -= amount;
-                logAction("DECREASE", clientId, clientInfo.counter);
                 out.println("Counter decreased to " + clientInfo.counter);
             } else {
                 out.println("ERROR: Client not registered.");
@@ -109,24 +128,14 @@ public class Server {
         private void handleLogout(PrintWriter out) {
             if (clientId != null) {
                 clients.remove(clientId);
-                logAction("LOGOUT", clientId, 0);
                 if (out != null) {
                     out.println("ACK: Logout successful.");
                 }
             }
         }
+    }
 
-        private void logAction(String action, String clientId, int counter) {
-            try (PrintWriter logWriter = new PrintWriter(new FileWriter("server.log", true))) {
-                logWriter.printf("%s: Client %s, Counter = %d%n", action, clientId, counter);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-    }
-public static void main(String args[])
-    {
+    public static void main(String args[]) {
         Server server = new Server();
         server.start(5000);
     }

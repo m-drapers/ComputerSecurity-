@@ -2,7 +2,6 @@ import java.net.*;
 import java.io.*;
 import java.util.Scanner;
 
-
 public class Client {
     private Socket clientSocket;
     private PrintWriter out;
@@ -12,17 +11,16 @@ public class Client {
         try {
             clientSocket = new Socket(ip, port);
             out = new PrintWriter(clientSocket.getOutputStream(), true);
-            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream())); 
+            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
         } catch (UnknownHostException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
-        
     }
 
     public String sendMessage(String msg) {
-        String resp = null; // Declare and initialize 'resp' outside the try block
+        String resp = null;
         try {
             out.println(msg);
             resp = in.readLine();
@@ -36,28 +34,41 @@ public class Client {
         try {
             in.close();
             out.close();
-        clientSocket.close();
+            clientSocket.close();
         } catch (IOException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }
 
     public static void main(String[] args) {
         Scanner inputScanner = new Scanner(System.in);
-        
+
         // Get IP address from user
         System.out.print("Enter IP address: ");
         String ipAddress = inputScanner.nextLine();
-        
+
         // Get port from user
         System.out.print("Enter port number: ");
         int port = inputScanner.nextInt();
-        
+
+        // Get client ID from user
+        inputScanner.nextLine(); // Consume newline
+        System.out.print("Enter client ID: ");
+        String clientId = inputScanner.nextLine();
+
+        // Get password from user
+        System.out.print("Enter password: ");
+        String password = inputScanner.nextLine();
+
         // Create client with user-provided IP and port
         Client client = new Client();
         client.startConnection(ipAddress, port);
 
+        // Register the client
+        String response = client.sendMessage("REGISTER " + clientId + " " + password);
+        System.out.println(response);
+
         inputScanner.close();
+        client.stopConnection();
     }
 }
