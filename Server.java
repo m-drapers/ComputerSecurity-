@@ -1,11 +1,19 @@
 import java.net.*;
 import java.io.*;
+import netscape.javascript.JSObject;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
+import java.nio.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 public class Server {
     private ServerSocket serverSocket;
     private Map<String, ClientInfo> clients = new HashMap<>();
+    private static final DateTimeFormatter Formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     public void start(int port) {
         try {
@@ -64,9 +72,11 @@ public class Server {
                             break;
                         case "INCREASE":
                             handleIncrease(out, Integer.parseInt(parts[1]));
+                            generatelogfile(clientId, command, Integer.parseInt(parts[1]));
                             break;
                         case "DECREASE":
                             handleDecrease(out, Integer.parseInt(parts[1]));
+                            generatelogfile(clientId, command, Integer.parseInt(parts[1]));
                             break;
                         case "LOGOUT":
                             handleLogout(out);
@@ -135,7 +145,43 @@ public class Server {
         }
     }
 
+    private static void generatelogfile(String clientId, String action, int amount){
+        final String LOG_FILE = "logfile.JSON"; 
+
+        //Create JSON object
+        Map<String, Object> logEntry = new LinkedHashMap<>();
+        logEntry.put("timestamp",LocalDateTime.now().format(Formatter));
+        logEntry.put("id", clientId);
+        logEntry.put("action", action);
+        logEntry.put("amount", amount);
+
+        // Convert Map to JSON String
+        String jsonBuilder = mapToJsonString(logEntry);
+        //System.out.println(jsonString);
+
+        try (FileWriter fileWriter = new FileWriter(LOG_FILE, true)) {
+            fileWriter.write(jsonBuilder + "\n");    
+
+        } catch (IOException e) {
+            System.err.println("Error writing to log file: " + e.getMessage());
+        }
+
+    }
+
+    // Method to convert a Map to JSON-like string
+    public static String mapToJsonString(Map<String, Object> map) {
+        StringBuilder jsonBuilder = new StringBuilder("{");
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            jsonBuilder.append("\"").append(entry.getKey()).append("\": ")
+                       .append("\"").append(entry.getValue()).append("\", ");
+        }
+        jsonBuilder.delete(jsonBuilder.length() - 2, jsonBuilder.length()); // remove trailing comma
+        jsonBuilder.append("}");
+        return jsonBuilder.toString();
+    }
+
     public static void main(String args[]) {
+        //generatelogfile("1", "increase", 600);
         Server server = new Server();
         server.start(5000);
     }
