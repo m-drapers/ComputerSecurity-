@@ -71,12 +71,22 @@ public class Server {
                             handleRegister(out, parts);
                             break;
                         case "INCREASE":
-                            handleIncrease(out, Integer.parseInt(parts[1]));
-                            generatelogfile(clientId, command, Integer.parseInt(parts[1]));
+                            int increaseAmount = Integer.parseInt(parts[1]);
+                            if (increaseAmount < 0) {
+                                throw new IllegalArgumentException("Amount cannot be negative");
+                            } else {
+                                handleIncrease(out, increaseAmount);
+                                generatelogfile(clientId, command, increaseAmount);
+                            }
                             break;
                         case "DECREASE":
-                            handleDecrease(out, Integer.parseInt(parts[1]));
-                            generatelogfile(clientId, command, Integer.parseInt(parts[1]));
+                            int decreaseAmount = Integer.parseInt(parts[1]);
+                            if (decreaseAmount < 0) {
+                                throw new IllegalArgumentException("Amount cannot be negative");
+                            } else {
+                                handleDecrease(out, decreaseAmount);
+                                generatelogfile(clientId, command, decreaseAmount);
+                            }
                             break;
                         case "LOGOUT":
                             handleLogout(out);
