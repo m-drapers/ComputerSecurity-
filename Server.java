@@ -1,13 +1,21 @@
 import java.net.*;
 import java.io.*;
 import netscape.javascript.JSObject;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Scanner;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.nio.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class Server {
@@ -57,6 +65,7 @@ public class Server {
         }
 
         public void run() {
+            String filePath = clientId + ".json";
             try {
                 in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
@@ -76,6 +85,7 @@ public class Server {
                                 throw new IllegalArgumentException("Amount cannot be negative");
                             } else {
                                 handleIncrease(out, increaseAmount);
+                                addStep(filePath, command);
                                 generatelogfile(clientId, command, increaseAmount);
                             }
                             break;
@@ -85,11 +95,13 @@ public class Server {
                                 throw new IllegalArgumentException("Amount cannot be negative");
                             } else {
                                 handleDecrease(out, decreaseAmount);
+                                addStep(filePath, command);
                                 generatelogfile(clientId, command, decreaseAmount);
                             }
                             break;
                         case "LOGOUT":
-                            handleLogout(out);
+                            
+                            handleLogout(out, filePath);
                             break;
                         default:
                             out.println("ERROR: Unknown command.");
@@ -99,7 +111,7 @@ public class Server {
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
-                handleLogout(out);
+                handleLogout(out, filePath);
                 try {
                     clientSocket.close();
                 } catch (IOException e) {
@@ -145,15 +157,51 @@ public class Server {
             }
         }
 
-        private void handleLogout(PrintWriter out) {
+        private void handleLogout(PrintWriter out, String filePath) {
             if (clientId != null) {
                 clients.remove(clientId);
+                try {
+                    // Create a Path object for the file
+                    Path path = Paths.get(filePath);
+
+                    // Delete the file
+                    Files.delete(path);
+
+                } catch (IOException e) {
+                    System.err.println("Failed to delete the file " + filePath + ": " + e.getMessage());
+                }
+
                 if (out != null) {
                     out.println("ACK: Logout successful.");
                 }
             }
         }
+
+        private static void addStep(String filePath, String command) {
+            try {
+                // Read the content of the JSON file
+                String jsonContent = new String(Files.readAllBytes(Paths.get(filePath)));
+
+                JSONObject clientJson = new JSONObject(jsonContent);
+                JSONObject actionsJson = clientJson.getJSONObject("actions");
+
+                // Get the "steps" array inside the "actions" object
+                JSONArray stepsArray = actionsJson.getJSONArray("steps");
+
+                // Add a new step to the "steps" array
+                stepsArray.put(command); 
+
+                // Write the modified JSON object back to the file
+                try (FileWriter fileWriter = new FileWriter(filePath)) {
+                    fileWriter.write(clientJson.toString(4)); 
+                }
+
+            } catch (IOException e) {
+                System.err.println("Error reading or writing to client file: " + e.getMessage());
+            }
+        }
     }
+
 
     private static void generatelogfile(String clientId, String action, int amount){
         final String LOG_FILE = "logfile.JSON"; 
@@ -167,7 +215,6 @@ public class Server {
 
         // Convert Map to JSON String
         String jsonBuilder = mapToJsonString(logEntry);
-        //System.out.println(jsonString);
 
         try (FileWriter fileWriter = new FileWriter(LOG_FILE, true)) {
             fileWriter.write(jsonBuilder + "\n");    

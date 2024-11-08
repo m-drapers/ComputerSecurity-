@@ -1,0 +1,12 @@
+{
+    "server": {
+        "port": 111,
+        "ip": "127.0.0.1"
+    },
+    "password": "333",
+    "id": "Ingrid",
+    "actions": {
+        "steps": [],
+        "delay": ""
+    }
+}
