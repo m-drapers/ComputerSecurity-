@@ -7,8 +7,12 @@ public class Client {
     private PrintWriter out;
     private BufferedReader in;
 
-    public void startConnection(String ip, int port) {
+    public void startConnection(int port) {
         try {
+            // Get the local IP address of the device
+            InetAddress localIpAddress = InetAddress.getLocalHost();
+            String ip = localIpAddress.getHostAddress();
+
             clientSocket = new Socket(ip, port);
             out = new PrintWriter(clientSocket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
@@ -43,10 +47,6 @@ public class Client {
     public static void main(String[] args) {
         Scanner inputScanner = new Scanner(System.in);
 
-        // Get IP address from user
-        System.out.print("Enter IP address: ");
-        String ipAddress = inputScanner.nextLine();
-
         // Get port from user
         System.out.print("Enter port number: ");
         int port = inputScanner.nextInt();
@@ -62,7 +62,7 @@ public class Client {
 
         // Create client with user-provided IP and port
         Client client = new Client();
-        client.startConnection(ipAddress, port);
+        client.startConnection( port);
 
         // Register the client
         String response = client.sendMessage("REGISTER " + clientId + " " + password);
