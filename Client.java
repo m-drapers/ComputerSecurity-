@@ -4,11 +4,13 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Scanner;
+import KeyEncrypt.RSA;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class Client {
+    static RSA rsa = new RSA();
     private Socket clientSocket;
     private PrintWriter out;
     private BufferedReader in;
@@ -52,14 +54,14 @@ public class Client {
         }
     }
 
-    private static void clientCreation(String clientId, String password, String ip, int port ){
-        String clientFile = clientId + ".JSON" ;
+    private static void clientCreation(String clientId, int clientNumber, String password, String ip, int port ) throws Exception {
+        String clientFile = "client"+ String.valueOf(clientNumber) + ".JSON" ;
 
         Map<String, Object> client = new LinkedHashMap<>();
         
         // Client Information
         client.put("id", clientId);
-        client.put("password", password);
+        client.put("password",rsa.encrypt(password));
 
         // Server Informatiom
         Map<String, Object> server = new LinkedHashMap<>();
@@ -89,7 +91,7 @@ public class Client {
     }
     
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         Scanner inputScanner = new Scanner(System.in);
 
         // Get port from user
@@ -101,16 +103,21 @@ public class Client {
         System.out.print("Enter client ID: ");
         String clientId = inputScanner.nextLine();
 
+        //TODO check the password
+
         // Get password from user
         System.out.print("Enter password: ");
         String password = inputScanner.nextLine();
 
+        //TODO parallel running for multiple clients
+
         // Create client with user-provided IP and port
         Client client = new Client();
-
-        clientCreation(clientId, password, "127.0.0.1", port);
+        int clientNumber =0;
+        clientCreation(clientId, clientNumber, password, "127.0.0.1", port);
         client.startConnection( port);
 
+        clientNumber++;
         // Register the client
         String response = client.sendMessage("REGISTER " + clientId + " " + password);
         System.out.println(response);
