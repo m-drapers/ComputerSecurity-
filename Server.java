@@ -1,6 +1,5 @@
 import java.net.*;
 import java.io.*;
-import netscape.javascript.JSObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,7 +12,6 @@ import org.json.JSONObject;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.nio.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -45,20 +43,23 @@ public class Server {
     private class ClientInfo {
         String id;
         String password;
+        int instancesCount;
         int counter;
 
-        ClientInfo(String id, String password, int counter) {
+        ClientInfo(String id, String password) {
             this.id = id;
             this.password = password;
-            this.counter = counter;
+            this.instancesCount = 1;
+            this.counter = 0;
         }
     }
 
-    private class ClientHandler extends Thread {
+    private class ClientHandler extends Thread { // Each client connection is handled in a separate thread
         private Socket clientSocket;
         private PrintWriter out;
         private BufferedReader in;
         private String clientId;
+        private String password;
 
         public ClientHandler(Socket socket) {
             this.clientSocket = socket;
@@ -77,30 +78,13 @@ public class Server {
 
                     switch (command) {
                         case "REGISTER":
-                            handleRegister(out, parts);
+                            handleRegister(out, parts, filePath);
                             break;
                         case "INCREASE":
-                            int increaseAmount = Integer.parseInt(parts[1]);
-                            if (increaseAmount < 0) {
-                                throw new IllegalArgumentException("Amount cannot be negative");
-                            } else {
-                                handleIncrease(out, increaseAmount);
-                                addStep(filePath, command);
-                                generatelogfile(clientId, command, increaseAmount);
-                            }
-                            break;
                         case "DECREASE":
-                            int decreaseAmount = Integer.parseInt(parts[1]);
-                            if (decreaseAmount < 0) {
-                                throw new IllegalArgumentException("Amount cannot be negative");
-                            } else {
-                                handleDecrease(out, decreaseAmount);
-                                addStep(filePath, command);
-                                generatelogfile(clientId, command, decreaseAmount);
-                            }
+                            handleCounterOperation(out, command, parts, filePath);
                             break;
                         case "LOGOUT":
-                            
                             handleLogout(out, filePath);
                             break;
                         default:
@@ -114,66 +98,92 @@ public class Server {
                 handleLogout(out, filePath);
                 try {
                     clientSocket.close();
+                    in.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
         }
 
-        private void handleRegister(PrintWriter out, String[] parts) {
+        private void handleRegister(PrintWriter out, String[] parts, String filePath) {
             if (parts.length < 3) {
                 out.println("ERROR: Invalid registration format.");
                 return;
             }
 
-            clientId = parts[1];
+            String clientId = parts[1];
             String password = parts[2];
 
             if (clients.containsKey(clientId)) {
-                out.println("ERROR: ID already registered.");
+                // Check password against the stored password in the JSON file
+                try {
+                    String jsonContent = new String(Files.readAllBytes(Paths.get(filePath)));
+                    JSONObject clientJson = new JSONObject(jsonContent);
+                    String storedPassword = clientJson.getString("password");
+
+                    if (!storedPassword.equals(password)) {
+                        out.println("ERROR: ID already registered with a different password.");
+                        return;
+                    } else{
+                        clients.get(clientId).instancesCount++;
+                        return;
+                    }
+                } catch (IOException e) {
+                    out.println("ERROR: Failed to access client data.");
+                    return;
+                }
             } else {
-                clients.put(clientId, new ClientInfo(clientId, password, 0));
+                // Register the new client
+                clients.put(clientId, new ClientInfo(clientId, password));
                 out.println("ACK: Registration successful.");
             }
         }
 
-        private void handleIncrease(PrintWriter out, int amount) {
+        private void handleCounterOperation(PrintWriter out, String command, String[] parts, String filePath) throws IOException {
+            if (clientId == null) {
+                out.println("ERROR: Client not registered.");
+                return;
+            }
+    
+            int amount = Integer.parseInt(parts[1]);
+            if (amount < 0) {
+                throw new IllegalArgumentException("Amount cannot be negative");
+            }
+   
             ClientInfo clientInfo = clients.get(clientId);
-            if (clientInfo != null) {
+            if (command.equals("INCREASE")) {
                 clientInfo.counter += amount;
-                out.println("Counter increased to " + clientInfo.counter);
-            } else {
-                out.println("ERROR: Client not registered.");
-            }
-        }
-
-        private void handleDecrease(PrintWriter out, int amount) {
-            ClientInfo clientInfo = clients.get(clientId);
-            if (clientInfo != null) {
+                addStep(filePath, command + " " + amount);
+            } else { // DECREASE
                 clientInfo.counter -= amount;
-                out.println("Counter decreased to " + clientInfo.counter);
-            } else {
-                out.println("ERROR: Client not registered.");
+                addStep(filePath, command + " " + amount);
             }
+            generatelogfile(clientId, command, amount);
         }
 
         private void handleLogout(PrintWriter out, String filePath) {
             if (clientId != null) {
-                clients.remove(clientId);
-                try {
-                    // Create a Path object for the file
-                    Path path = Paths.get(filePath);
+                ClientInfo clientInfo = clients.get(clientId);
 
-                    // Delete the file
-                    Files.delete(path);
+                if (clientInfo != null) {
+                    clientInfo.instancesCount--; // Decrement instance count
 
-                } catch (IOException e) {
-                    System.err.println("Failed to delete the file " + filePath + ": " + e.getMessage());
+                    if (clientInfo.instancesCount <= 0) {
+                        // If no more instances, remove from clients map and delete JSON file
+                        clients.remove(clientId);
+                        try {
+                            // Delete the client's JSON file
+                            Path path = Paths.get(filePath);
+                            Files.delete(path);
+                            out.println("ACK: Logout successful.");
+                        } catch (IOException e) {
+                            System.err.println("Failed to delete the file " + filePath + ": " + e.getMessage());
+                        }
+                    } else {
+                        out.println("ACK: Logout successful, remaining instances: " + clientInfo.instancesCount);
+                    }
                 }
-
-                if (out != null) {
-                    out.println("ACK: Logout successful.");
-                }
+                clientId = null;
             }
         }
 
@@ -185,13 +195,10 @@ public class Server {
                 JSONObject clientJson = new JSONObject(jsonContent);
                 JSONObject actionsJson = clientJson.getJSONObject("actions");
 
-                // Get the "steps" array inside the "actions" object
-                JSONArray stepsArray = actionsJson.getJSONArray("steps");
-
                 // Add a new step to the "steps" array
+                JSONArray stepsArray = actionsJson.getJSONArray("steps");
                 stepsArray.put(command); 
 
-                // Write the modified JSON object back to the file
                 try (FileWriter fileWriter = new FileWriter(filePath)) {
                     fileWriter.write(clientJson.toString(4)); 
                 }
