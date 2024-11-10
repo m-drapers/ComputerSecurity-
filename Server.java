@@ -135,6 +135,7 @@ public class Server {
                 } else {
                     // Error if the ID is in use with a different password
                     out.println("ERROR: ID already in use with a different password.");
+                    return;
                 }
             } else {
                 // Register new client if ID is not in use

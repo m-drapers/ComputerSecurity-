@@ -166,8 +166,29 @@ public class Client {
         client.startConnection(ip,port);
 
         //register the client
-        String response = client.sendMessage("REGISTER " + clientId + " " + password);
+        /*String response = client.sendMessage("REGISTER " + clientId + " " + password);
         System.out.println(response);
+
+        // Check if the response is an error message and terminate if it is
+        if (response.startsWith("ERROR")) {
+            System.out.println("Terminating client due to error.");
+            return; // Exits the main method or can use System.exit(0) to stop the entire client program
+        }*/
+
+        String response;
+
+        do {
+            // Register the client
+            response = client.sendMessage("REGISTER " + clientId + " " + password);
+            System.out.println(response);
+
+            // Check if the response is an error message
+            if (response.startsWith("ERROR")) {
+                System.out.println("Invalid password. Please try again.");
+                System.out.print("Enter password: "); // Prompt user to re-enter password
+                password = inputScanner.nextLine(); // Update password
+            }
+        } while (response.startsWith("ERROR")); // Loop until successful registration
 
         String command;
         do {
