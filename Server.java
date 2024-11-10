@@ -1,15 +1,11 @@
 import java.net.*;
 import java.io.*;
-import netscape.javascript.JSObject;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Scanner;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -192,18 +188,33 @@ public class Server {
                 // Read the content of the JSON file
                 String jsonContent = new String(Files.readAllBytes(Paths.get(filePath)));
 
-                JSONObject clientJson = new JSONObject(jsonContent);
-                JSONObject actionsJson = clientJson.getJSONObject("actions");
+                // Locate steps section
+                int actionsIndex = jsonContent.indexOf("\"actions\"");
+                int stepsIndex = jsonContent.indexOf("\"steps\": [", actionsIndex);
 
-                // Get the "steps" array inside the "actions" object
-                JSONArray stepsArray = actionsJson.getJSONArray("steps");
+                // Find the position where the "steps" array ends
+                int stepsEndIndex = jsonContent.indexOf("]", stepsIndex);
 
-                // Add a new step to the "steps" array
-                stepsArray.put(command); 
+                // Create the new command entry
+                String newStepEntry = "\"" + command + "\"";
+
+                // Check if the steps array is empty or not
+                boolean isArrayEmpty = jsonContent.substring(stepsIndex + 9, stepsEndIndex).trim().isEmpty();
+                
+                // Insert the new step command
+                String updatedStepsArray;
+                if (isArrayEmpty) {
+                    // If the array is empty, just insert the new step
+                    updatedStepsArray = jsonContent.substring(0, stepsEndIndex) + newStepEntry + jsonContent.substring(stepsEndIndex);
+                } else {
+                    // If the array has existing elements, add a comma before the new step
+                    updatedStepsArray = jsonContent.substring(0, stepsEndIndex) + ", " + newStepEntry + jsonContent.substring(stepsEndIndex);
+                } 
 
                 // Write the modified JSON object back to the file
                 try (FileWriter fileWriter = new FileWriter(filePath)) {
-                    fileWriter.write(clientJson.toString(4)); 
+                    fileWriter.write(updatedStepsArray); 
+                    fileWriter.flush();
                 }
 
             } catch (IOException e) {

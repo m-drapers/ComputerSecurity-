@@ -5,9 +5,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Scanner;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
 public class Client {
     private Socket clientSocket;
     private PrintWriter out;
@@ -53,30 +50,30 @@ public class Client {
 
         Map<String, Object> client = new LinkedHashMap<>();
         
-        //client information
+        //Client information
         client.put("id", clientId);
         client.put("password", password);
 
-        //server informatiom
+        //Server informatiom
         Map<String, Object> server = new LinkedHashMap<>();
         server.put("ip", ip);
         server.put("port", port);
         client.put("server", server);
 
-        //action information
+        //Action information
         int delay = (int) (Math.random() * 121); // Generates a random integer from 0 to 120
 
         Map<String, Object> action = new LinkedHashMap<>();
         action.put("delay", delay );
-        action.put("steps", new JSONArray()); // Empty array
+        action.put("steps", new ArrayList<>()); // Empty array
         client.put("actions", action);
 
-        //convert LinkedHashMap to JSONObject
-        JSONObject clientJson = new JSONObject(client);
+        //Convert LinkedHashMap to JSON
+        String jsonBuilder = mapToJsonString(client,0);
 
         //write JSON string to individual file
         try (FileWriter fileWriter = new FileWriter(clientFile)) {
-            fileWriter.write(clientJson.toString(4)); // Pretty print with 4-space indentation
+            fileWriter.write(jsonBuilder + "\n"); 
             fileWriter.flush();
             System.out.println("Client JSON file created: " + clientFile);
         } catch (IOException e) {
@@ -84,6 +81,38 @@ public class Client {
         }
         
 
+    }
+
+    //Generate JSON format
+    public static String mapToJsonString(Map<String, Object> map, int indentLevel) {
+        StringBuilder jsonBuilder = new StringBuilder("{\n");
+        String indent = "    ".repeat(indentLevel);
+        String nestedIndent = "    ".repeat(indentLevel + 1);
+
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            jsonBuilder.append(nestedIndent).append("\"").append(entry.getKey()).append("\": ");
+
+            // Check if the value is a Map
+            if (entry.getValue() instanceof Map) {
+                jsonBuilder.append(mapToJsonString((Map<String, Object>) entry.getValue(), indentLevel + 1));
+            }
+            // Check if it is steps section
+            else if (entry.getKey().equals("steps")) {
+                jsonBuilder.append("[]");
+            }
+            // Add " " for strings
+            else if (entry.getValue() instanceof String) {
+                jsonBuilder.append("\"").append(entry.getValue()).append("\"");
+            } 
+            else {
+                jsonBuilder.append(entry.getValue());
+            }
+            jsonBuilder.append(",\n");
+        }
+
+        jsonBuilder.delete(jsonBuilder.length() - 2, jsonBuilder.length());
+        jsonBuilder.append("\n").append(indent).append("}");
+        return jsonBuilder.toString();
     }
 
     public void sendIncrease(int amount) {
