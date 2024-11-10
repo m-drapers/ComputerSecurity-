@@ -10,8 +10,6 @@ public class Client {
     private PrintWriter out;
     private BufferedReader in;
 
-
-
     public void startConnection(String ip, int port) {
         try {          
             clientSocket = new Socket(ip, port);
@@ -27,8 +25,8 @@ public class Client {
     public String sendMessage(String msg) {
         String resp = null;
         try {
-            out.println(msg);
-            resp = in.readLine();
+            out.println(msg); // Send message to the server
+            resp = in.readLine(); // Read response from the server
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -36,42 +34,79 @@ public class Client {
     }
 
     public void stopConnection() {
-        try {
-            in.close();
-            out.close();
-            clientSocket.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+            try {
+                if (in != null) in.close();
+                if (out != null) out.close();
+                if (clientSocket != null) clientSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
-    }
+    
+    private static void clientCreation(String clientId, String password, String ip,  int port, Scanner inputScanner, Client client){
+        String clientFile = clientId + ".json" ;
 
-    private static void clientCreation(String clientId, String password, String ip,  int port ){
-        String clientFile = clientId + ".JSON" ;
+        // Check if the file already exists
+        File file = new File(clientFile);
+        if (file.exists()) {
+            System.out.println("Client file already exists: " + clientFile);
 
-        Map<String, Object> client = new LinkedHashMap<>();
+            // Check the password
+            try (BufferedReader fileReader = new BufferedReader(new FileReader(clientFile))) {
+                String line;
+                String storedPassword = null;
+
+                while ((line = fileReader.readLine()) != null) {
+                    line = line.trim();  // Remove leading/trailing spaces
+                    if (line.startsWith("\"password\":")) {
+                        storedPassword = line.split(":")[1].trim();
+                        storedPassword = storedPassword.replace("\"", "").replace(",", "");
+                        break;
+                    }
+                }
+
+                // Compare the stored password with the given one
+                if (storedPassword == null || !storedPassword.equals(password)) {
+                    System.out.println("ERROR: Password does not match the one in the file. Terminating connection.");
+                    inputScanner.close();
+                    client.stopConnection();
+                    System.exit(0);
+                    return; 
+                } else {
+                    System.out.println("Password matches. Proceeding with further steps.");
+                }
+
+            } catch (IOException e) {
+                System.err.println("Error reading client file: " + e.getMessage());
+                return;
+            }
+            return; // Exit the method if file exists and password mismatch occurs
+        }
+
+        Map<String, Object> newclient = new LinkedHashMap<>();
         
-        //Client information
-        client.put("id", clientId);
-        client.put("password", password);
+        // Client information
+        newclient.put("id", clientId);
+        newclient.put("password", password);
 
-        //Server informatiom
+        // Server information
         Map<String, Object> server = new LinkedHashMap<>();
         server.put("ip", ip);
         server.put("port", port);
-        client.put("server", server);
+        newclient.put("server", server);
 
-        //Action information
+        // Action information
         int delay = (int) (Math.random() * 121); // Generates a random integer from 0 to 120
 
         Map<String, Object> action = new LinkedHashMap<>();
         action.put("delay", delay );
         action.put("steps", new ArrayList<>()); // Empty array
-        client.put("actions", action);
+        newclient.put("actions", action);
 
-        //Convert LinkedHashMap to JSON
-        String jsonBuilder = mapToJsonString(client,0);
+        // Convert LinkedHashMap to JSON
+        String jsonBuilder = mapToJsonString(newclient, 0);
 
-        //write JSON string to individual file
+        // write JSON string to individual file
         try (FileWriter fileWriter = new FileWriter(clientFile)) {
             fileWriter.write(jsonBuilder + "\n"); 
             fileWriter.flush();
@@ -79,11 +114,9 @@ public class Client {
         } catch (IOException e) {
             System.err.println("Error writing to client file: " + e.getMessage());
         }
-        
-
     }
 
-    //Generate JSON format
+    // Generate JSON format
     public static String mapToJsonString(Map<String, Object> map, int indentLevel) {
         StringBuilder jsonBuilder = new StringBuilder("{\n");
         String indent = "    ".repeat(indentLevel);
@@ -137,7 +170,7 @@ public class Client {
     public static void main(String[] args) {
         Scanner inputScanner = new Scanner(System.in);
 
-        //get ip from user
+        // Get ip from user
         String ip = null;
         try {
             InetAddress localIpAddress = InetAddress.getLocalHost();
@@ -146,26 +179,30 @@ public class Client {
             e.printStackTrace(); 
         }
 
-        //get port from user
+        // Get port from user
         System.out.print("Enter port number: ");
         int port = inputScanner.nextInt();
 
-        //get client ID from user
+        // Get client ID from user
         inputScanner.nextLine(); // Consume newline
         System.out.print("Enter client ID: ");
         String clientId = inputScanner.nextLine();
 
-        //get password from user
+        // Get password from user (hidden input)
+        Console console = System.console();
+        String password;
         System.out.print("Enter password: ");
-        String password = inputScanner.nextLine();
+        char[] passwordArray = console.readPassword();
+        password = new String(passwordArray);
 
-        //create client with user-provided IP and port
+        // Create client with user-provided IP and port
         Client client = new Client();
 
-        clientCreation(clientId, password, ip, port);
         client.startConnection(ip,port);
+        clientCreation(clientId, password, ip, port, inputScanner, client);
+        
 
-        //register the client
+        // Register the client
         String response = client.sendMessage("REGISTER " + clientId + " " + password);
         System.out.println(response);
 
@@ -199,4 +236,3 @@ public class Client {
         client.stopConnection();
     }
 }
-

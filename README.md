@@ -17,7 +17,6 @@ this client-server application facilitates a basic command protocol between a cl
 ### System Requirements
 
 - Java Development Kit (JDK) 8 or above
-- JSON Library (e.g., `org.json` library) for JSON parsing and generation
 
 ### Installation
 
