@@ -225,7 +225,7 @@ public class Server {
 
     }
 
-    // Method to convert a Map to JSON-like string
+    //method to convert a Map to JSON-like string
     public static String mapToJsonString(Map<String, Object> map) {
         StringBuilder jsonBuilder = new StringBuilder("{");
         for (Map.Entry<String, Object> entry : map.entrySet()) {
@@ -238,9 +238,8 @@ public class Server {
     }
 
     public static void main(String args[]) {
-        //generatelogfile("1", "increase", 600);
         Server server = new Server();
-        server.start(5000);
+        server.start(5001);
     }
 }
 

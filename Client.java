@@ -17,7 +17,7 @@ public class Client {
 
     public void startConnection(int port) {
         try {
-            // Get the local IP address of the device
+            //get the local IP address of the device
             InetAddress localIpAddress = InetAddress.getLocalHost();
             String ip = localIpAddress.getHostAddress();
 
@@ -57,26 +57,26 @@ public class Client {
 
         Map<String, Object> client = new LinkedHashMap<>();
         
-        // Client Information
+        //client information
         client.put("id", clientId);
         client.put("password", password);
 
-        // Server Informatiom
+        //server informatiom
         Map<String, Object> server = new LinkedHashMap<>();
         server.put("ip", ip);
         server.put("port", port);
         client.put("server", server);
 
-        // Action Information
+        //action information
         Map<String, Object> action = new LinkedHashMap<>();
         action.put("delay", "" );
         action.put("steps", new JSONArray()); // Empty array
         client.put("actions", action);
 
-        // Convert LinkedHashMap to JSONObject
+        //convert LinkedHashMap to JSONObject
         JSONObject clientJson = new JSONObject(client);
 
-        // Write JSON string to individual file
+        //write JSON string to individual file
         try (FileWriter fileWriter = new FileWriter(clientFile)) {
             fileWriter.write(clientJson.toString(4)); // Pretty print with 4-space indentation
             fileWriter.flush();
@@ -92,26 +92,26 @@ public class Client {
     public static void main(String[] args) {
         Scanner inputScanner = new Scanner(System.in);
 
-        // Get port from user
+        //get port from user
         System.out.print("Enter port number: ");
         int port = inputScanner.nextInt();
 
-        // Get client ID from user
+        //get client ID from user
         inputScanner.nextLine(); // Consume newline
         System.out.print("Enter client ID: ");
         String clientId = inputScanner.nextLine();
 
-        // Get password from user
+        //get password from user
         System.out.print("Enter password: ");
         String password = inputScanner.nextLine();
 
-        // Create client with user-provided IP and port
+        //create client with user-provided IP and port
         Client client = new Client();
 
         clientCreation(clientId, password, "127.0.0.1", port);
-        client.startConnection( port);
+        client.startConnection(port);
 
-        // Register the client
+        //register the client
         String response = client.sendMessage("REGISTER " + clientId + " " + password);
         System.out.println(response);
 
