@@ -4,8 +4,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Scanner;
-
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class Client {
@@ -59,7 +57,7 @@ public class Client {
         
         // Client Information
         client.put("id", clientId);
-        client.put("password", password);
+        client.put("password", password); 
 
         // Server Informatiom
         Map<String, Object> server = new LinkedHashMap<>();
@@ -70,15 +68,21 @@ public class Client {
         // Action Information
         Map<String, Object> action = new LinkedHashMap<>();
         action.put("delay", "" );
-        action.put("steps", new JSONArray()); // Empty array
-        client.put("actions", action);
+        action.put("steps", new ArrayList<>()); // Empty array
+        client.put("actions", action); 
 
         // Convert LinkedHashMap to JSONObject
-        JSONObject clientJson = new JSONObject(client);
+
+        String jsonBuilder = mapToJsonString(client,0);
+
+        JSONObject clientJson = new JSONObject();
+        clientJson.put("id", client.get("id"));
+        clientJson.put("password", client.get("password")); 
 
         // Write JSON string to individual file
         try (FileWriter fileWriter = new FileWriter(clientFile)) {
-            fileWriter.write(clientJson.toString(4)); // Pretty print with 4-space indentation
+            fileWriter.write(jsonBuilder + "\n");
+            //fileWriter.write(clientJson.toString(4)); // Pretty print with 4-space indentation
             fileWriter.flush();
             System.out.println("Client JSON file created: " + clientFile);
         } catch (IOException e) {
@@ -86,6 +90,40 @@ public class Client {
         }
         
 
+    }
+
+    public static String mapToJsonString(Map<String, Object> map, int indentLevel) {
+        StringBuilder jsonBuilder = new StringBuilder("{\n");
+        String indent = "    ".repeat(indentLevel);
+        String nestedIndent = "    ".repeat(indentLevel + 1);
+
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            jsonBuilder.append(nestedIndent).append("\"").append(entry.getKey()).append("\": ");
+
+            // Check if the value is a Map (nested JSON object)
+            if (entry.getValue() instanceof Map) {
+                jsonBuilder.append(mapToJsonString((Map<String, Object>) entry.getValue(), indentLevel + 1));
+            }
+            // If the value is the "steps" list, add it as an empty array
+            else if (entry.getKey().equals("steps")) {
+                jsonBuilder.append("[]");
+            }
+            // For regular strings, include them with quotes
+            else if (entry.getValue() instanceof String) {
+                jsonBuilder.append("\"").append(entry.getValue()).append("\"");
+            } 
+            // For other types like numbers
+            else {
+                jsonBuilder.append(entry.getValue());
+            }
+            jsonBuilder.append(",\n");
+        }
+
+        // Remove the last comma and newline, then close the JSON object
+        jsonBuilder.delete(jsonBuilder.length() - 2, jsonBuilder.length());
+        jsonBuilder.append("\n").append(indent).append("}");
+        //jsonBuilder.append("\n}");
+        return jsonBuilder.toString();
     }
     
 
