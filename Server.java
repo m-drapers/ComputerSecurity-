@@ -71,7 +71,7 @@ public class Server {
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
 
                 String message;
-                while ((message = in.readLine()) != null) {
+                while ((message = in.readLine()) != "LOGOUT") {
                     String[] parts = message.split(" ");
                     String command = parts[0];
 
@@ -125,17 +125,27 @@ public class Server {
                 out.println("ERROR: Invalid registration format.");
                 return;
             }
-
+        
             clientId = parts[1];
             String password = parts[2];
-
+        
+            // Check if the client ID is already registered
             if (clients.containsKey(clientId)) {
-                out.println("ERROR: ID already registered.");
+                ClientInfo existingClient = clients.get(clientId);
+        
+                // Verify if the password matches
+                if (existingClient.password.equals(password)) {
+                    out.println("ACK: Login successful.");
+                } else {
+                    // Error if the ID is in use with a different password
+                    out.println("ERROR: ID already in use with a different password.");
+                }
             } else {
+                // Register new client if ID is not in use
                 clients.put(clientId, new ClientInfo(clientId, password, 0));
                 out.println("ACK: Registration successful.");
             }
-        }
+        }        
 
         private void handleIncrease(PrintWriter out, int amount) {
             ClientInfo clientInfo = clients.get(clientId);
