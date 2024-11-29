@@ -1,15 +1,11 @@
 import java.net.*;
 import java.io.*;
-import netscape.javascript.JSObject;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Scanner;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -46,11 +42,13 @@ public class Server {
         String id;
         String password;
         int counter;
+        int instancesCount;
 
-        ClientInfo(String id, String password, int counter) {
+        ClientInfo(String id, String password, int counter, int instancesCount) {
             this.id = id;
             this.password = password;
             this.counter = counter;
+            this.instancesCount = 1;
         }
     }
 
@@ -65,13 +63,13 @@ public class Server {
         }
 
         public void run() {
-            String filePath = clientId + ".json";
+            
             try {
                 in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
 
                 String message;
-                while ((message = in.readLine()) != null) {
+                while ((message = in.readLine()) != "LOGOUT") {
                     String[] parts = message.split(" ");
                     String command = parts[0];
 
@@ -80,28 +78,11 @@ public class Server {
                             handleRegister(out, parts);
                             break;
                         case "INCREASE":
-                            int increaseAmount = Integer.parseInt(parts[1]);
-                            if (increaseAmount < 0) {
-                                throw new IllegalArgumentException("Amount cannot be negative");
-                            } else {
-                                handleIncrease(out, increaseAmount);
-                                addStep(filePath, command);
-                                generatelogfile(clientId, command, increaseAmount);
-                            }
-                            break;
                         case "DECREASE":
-                            int decreaseAmount = Integer.parseInt(parts[1]);
-                            if (decreaseAmount < 0) {
-                                throw new IllegalArgumentException("Amount cannot be negative");
-                            } else {
-                                handleDecrease(out, decreaseAmount);
-                                addStep(filePath, command);
-                                generatelogfile(clientId, command, decreaseAmount);
-                            }
+                            handleCounterOperation(out, command, parts);
                             break;
                         case "LOGOUT":
-                            
-                            handleLogout(out, filePath);
+                            handleLogout(out);
                             break;
                         default:
                             out.println("ERROR: Unknown command.");
@@ -111,7 +92,7 @@ public class Server {
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
-                handleLogout(out, filePath);
+                handleLogout(out);
                 try {
                     clientSocket.close();
                 } catch (IOException e) {
@@ -125,75 +106,110 @@ public class Server {
                 out.println("ERROR: Invalid registration format.");
                 return;
             }
-
+        
             clientId = parts[1];
             String password = parts[2];
-
+        
+            // Check if the client ID is already registered
             if (clients.containsKey(clientId)) {
-                out.println("ERROR: ID already registered.");
+                ClientInfo existingClient = clients.get(clientId);
+        
+                // Verify if the password matches
+                if (existingClient.password.equals(password)) {
+                    existingClient.instancesCount += 1;
+                    out.println("ACK: Login successful.");
+                } else {
+                    System.out.println("ERROR: ID already in use with a different password.");
+                }
             } else {
-                clients.put(clientId, new ClientInfo(clientId, password, 0));
+                // Register new client if ID is not in use
+                clients.put(clientId, new ClientInfo(clientId, password, 0, 1));
                 out.println("ACK: Registration successful.");
             }
-        }
+        }        
 
-        private void handleIncrease(PrintWriter out, int amount) {
+        private void handleCounterOperation(PrintWriter out, String command, String[] parts) {
+            if (clientId == null) {
+                out.println("ERROR: Client not registered.");
+                return;
+            }
+    
+            int amount = Integer.parseInt(parts[1]);
+            if (amount < 0) {
+                throw new IllegalArgumentException("Amount cannot be negative");
+            }
+   
             ClientInfo clientInfo = clients.get(clientId);
-            if (clientInfo != null) {
+            String filePath = clientInfo.id + ".json";
+            if (command.equals("INCREASE")) {
                 clientInfo.counter += amount;
-                out.println("Counter increased to " + clientInfo.counter);
-            } else {
-                out.println("ERROR: Client not registered.");
-            }
-        }
-
-        private void handleDecrease(PrintWriter out, int amount) {
-            ClientInfo clientInfo = clients.get(clientId);
-            if (clientInfo != null) {
+                addStep(filePath, command, amount);
+            } else { // DECREASE
                 clientInfo.counter -= amount;
-                out.println("Counter decreased to " + clientInfo.counter);
-            } else {
-                out.println("ERROR: Client not registered.");
+                addStep(filePath, command, amount);
             }
+            out.println("Counter " + command.toLowerCase()+"d to " + clientInfo.counter);
+
+            generatelogfile(clientId, command, amount);
         }
 
-        private void handleLogout(PrintWriter out, String filePath) {
+        private void handleLogout(PrintWriter out) {
+            String filePath = clients.get(clientId).id + ".json";
             if (clientId != null) {
-                clients.remove(clientId);
-                try {
-                    // Create a Path object for the file
-                    Path path = Paths.get(filePath);
+                ClientInfo clientInfo = clients.get(clientId);
 
-                    // Delete the file
-                    Files.delete(path);
+                if (clientInfo != null) {
+                    clientInfo.instancesCount -= 1; // Decrement instance count
 
-                } catch (IOException e) {
-                    System.err.println("Failed to delete the file " + filePath + ": " + e.getMessage());
+                    if (clientInfo.instancesCount <= 0) {
+                        // If no more instances, remove from clients map and delete JSON file
+                        clients.remove(clientId);
+                        try {
+                            // Delete the client's JSON file
+                            Path path = Paths.get(filePath);
+                            Files.delete(path);
+                            if (out != null){
+                                out.println("ACK: Logout successful.");
+                            }
+                        } catch (IOException e) {
+                            System.err.println("Failed to delete the file " + filePath + ": " + e.getMessage());
+                        }
+                    } else {
+                        out.println("ACK: Logout successful, remaining instances: " + clientInfo.instancesCount);
+                    }
                 }
-
-                if (out != null) {
-                    out.println("ACK: Logout successful.");
-                }
-            }
+                clientId = null;
+            }            
         }
 
-        private static void addStep(String filePath, String command) {
+        private void addStep(String filePath, String command, int amount) {
+            // String filePath = clients.get(clientId).id + ".json";
+
             try {
                 // Read the content of the JSON file
                 String jsonContent = new String(Files.readAllBytes(Paths.get(filePath)));
 
-                JSONObject clientJson = new JSONObject(jsonContent);
-                JSONObject actionsJson = clientJson.getJSONObject("actions");
+                // Locate "steps" section
+                int actionsIndex = jsonContent.indexOf("\"actions\"");
+                int stepsIndex = jsonContent.indexOf("\"steps\": [", actionsIndex);
+                int stepsEndIndex = jsonContent.indexOf("]", stepsIndex);
 
-                // Get the "steps" array inside the "actions" object
-                JSONArray stepsArray = actionsJson.getJSONArray("steps");
+                // Create the new command entry
+                String newStepEntry = "\"" + command + " " + amount + "\"";
+                
+                // Insert the new step command
+                boolean isArrayEmpty = jsonContent.substring(stepsIndex + 10, stepsEndIndex).trim().isEmpty();
+                String updatedStepsArray;
+                if (isArrayEmpty) {
+                    updatedStepsArray = jsonContent.substring(0, stepsEndIndex) + newStepEntry + jsonContent.substring(stepsEndIndex);
+                } else {
+                    updatedStepsArray = jsonContent.substring(0, stepsEndIndex) + ", " + newStepEntry + jsonContent.substring(stepsEndIndex);
+                } 
 
-                // Add a new step to the "steps" array
-                stepsArray.put(command); 
-
-                // Write the modified JSON object back to the file
+                // Update JSON file
                 try (FileWriter fileWriter = new FileWriter(filePath)) {
-                    fileWriter.write(clientJson.toString(4)); 
+                    fileWriter.write(updatedStepsArray); 
+                    fileWriter.flush();
                 }
 
             } catch (IOException e) {
@@ -206,7 +222,7 @@ public class Server {
     private static void generatelogfile(String clientId, String action, int amount){
         final String LOG_FILE = "logfile.JSON"; 
 
-        //Create JSON object
+        // Create JSON object
         Map<String, Object> logEntry = new LinkedHashMap<>();
         logEntry.put("timestamp",LocalDateTime.now().format(Formatter));
         logEntry.put("id", clientId);
@@ -238,9 +254,8 @@ public class Server {
     }
 
     public static void main(String args[]) {
-        //generatelogfile("1", "increase", 600);
         Server server = new Server();
-        server.start(5000);
+        server.start(5001);
     }
 }
 
