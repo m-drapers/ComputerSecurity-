@@ -1,4 +1,4 @@
 .env
-client.trustore
+client.truststore
 server.crt
 server.keystore
