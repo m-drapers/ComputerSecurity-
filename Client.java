@@ -5,20 +5,47 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Scanner;
 
+import java.security.KeyStore;
+import java.security.SecureRandom;
+
+import javax.net.ssl.*;
+
 public class Client {
     private Socket clientSocket;
     private PrintWriter out;
     private BufferedReader in;
 
     public void startConnection(String ip, int port) {
-        try {          
-            clientSocket = new Socket(ip, port);
+        try {       
+            // Load the client truststore
+            KeyStore trustStore = KeyStore.getInstance("JKS");
+            try (FileInputStream trustStoreStream = new FileInputStream("client.truststore")) {
+                char[] trustStorePassword = System.getenv("CLIENT_TRUSTSTORE_PASSWORD").toCharArray();
+                trustStore.load(trustStoreStream, trustStorePassword);
+            }
+
+            // Create trust manager
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("SunX509");
+            trustManagerFactory.init(trustStore);
+
+            // Initialize SSL context
+            SSLContext sslContext = SSLContext.getInstance("TLSv1.3");
+            sslContext.init(null, trustManagerFactory.getTrustManagers(), new SecureRandom());
+
+            // Create SSL client socket   
+            SSLSocketFactory socketFactory = sslContext.getSocketFactory();
+            SSLSocket clientSocket = (SSLSocket) socketFactory.createSocket(ip, port);
+            
             out = new PrintWriter(clientSocket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            
         } catch (UnknownHostException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+            stopConnection(); // Close resources if setup fails
         }
     }
 
@@ -161,9 +188,13 @@ public class Client {
     }
 
     public void sendLogout() {
-        System.out.println("Sending LOGOUT command.");
-        String response = sendMessage("LOGOUT");
-        System.out.println(response);
+        try{
+            System.out.println("Sending LOGOUT command.");
+            String response = sendMessage("LOGOUT");
+            System.out.println(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }        
     }
     
 
@@ -201,15 +232,21 @@ public class Client {
         client.startConnection(ip,port);
         clientCreation(clientId, password, ip, port, inputScanner, client);
         
-
         // Register the client
         String response = client.sendMessage("REGISTER " + clientId + " " + password);
         System.out.println(response);
+        if (!response.startsWith("ACK")) {
+            System.out.println("Server error during registration: " + response);
+            inputScanner.close();
+            client.stopConnection();
+            System.exit(1);
+        }
 
         String command;
         do {
             System.out.println("Enter command (INCREASE, DECREASE, LOGOUT): ");
-            command = inputScanner.nextLine().toUpperCase();
+
+            command = inputScanner.hasNextLine() ? inputScanner.nextLine().toUpperCase() : "LOGOUT";
 
             switch (command) {
                 case "INCREASE":

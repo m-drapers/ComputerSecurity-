@@ -1,0 +1,4 @@
+.env
+client.trustore
+server.crt
+server.keystore
