@@ -174,9 +174,17 @@ public class Server {
                 return;
             }
     
-            int amount = Integer.parseInt(parts[1]);
-            if (amount < 0) {
-                throw new IllegalArgumentException("Amount cannot be negative");
+            int amount;
+            // Check for strings
+            try{
+                amount = Integer.parseInt(parts[1]);
+            } catch (NumberFormatException e) {
+                out.println("ERROR: Invalid format.");
+                return;
+            }
+            // Check for overflow + no negative numbeers
+            if (amount < 0 || amount > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException("Invalid Amount");
             }
    
             ClientInfo clientInfo = clients.get(clientId);
