@@ -18,6 +18,22 @@ public class Server {
     private Map<String, ClientInfo> clients = new HashMap<>();
     private static final DateTimeFormatter Formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
 
+        // Method to load environment variables from .env file
+        public static void loadEnv() {
+            try (BufferedReader br = new BufferedReader(new FileReader(".env"))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    String[] parts = line.split("=", 2);
+                    if (parts.length == 2 && parts[0].startsWith("SERVER_")) {
+                        // Set the property in the system
+                        System.setProperty(parts[0], parts[1]);
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
     public void start(int port) {
         try {
             // Load the server keystore
@@ -58,6 +74,9 @@ public class Server {
             serverSocket.close();
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            System.clearProperty("SERVER_TRUSTORE_PASSWORD");
+            System.clearProperty("SERVER_KEYSTORE_PASSWORD");
         }
     }
 
@@ -282,6 +301,9 @@ public class Server {
     }
 
     public static void main(String args[]) {
+        // Load environment variables from .env file
+        loadEnv();
+        
         Server server = new Server();
         server.start(5001);
     }

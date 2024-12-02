@@ -15,12 +15,29 @@ public class Client {
     private PrintWriter out;
     private BufferedReader in;
 
+    // Method to load environment variables from .env file
+    public static void loadEnv() {
+        try (BufferedReader br = new BufferedReader(new FileReader(".env"))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.split("=", 2);
+                if (parts.length == 2 && parts[0].startsWith("CLIENT_")) {
+                    // Set the property in the system
+                    System.setProperty(parts[0], parts[1]);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
     public void startConnection(String ip, int port) {
         try {       
             // Load the client truststore
             KeyStore trustStore = KeyStore.getInstance("JKS");
             try (FileInputStream trustStoreStream = new FileInputStream("client.truststore")) {
-                char[] trustStorePassword = System.getenv("CLIENT_TRUSTSTORE_PASSWORD").toCharArray();
+                char[] trustStorePassword = System.getProperty("CLIENT_TRUSTSTORE_PASSWORD").toCharArray();
                 trustStore.load(trustStoreStream, trustStorePassword);
             }
 
@@ -67,6 +84,8 @@ public class Client {
                 if (clientSocket != null) clientSocket.close();
             } catch (IOException e) {
                 e.printStackTrace();
+            } finally {
+                System.clearProperty("CLIENT_TRUSTORE_PASSWORD");
             }
         }
     
@@ -199,6 +218,9 @@ public class Client {
     
 
     public static void main(String[] args) {
+        // Load environment variables from .env file
+        loadEnv();
+
         Scanner inputScanner = new Scanner(System.in);
 
         // Get ip from user

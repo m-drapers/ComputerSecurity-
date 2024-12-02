@@ -88,3 +88,5 @@
 {"timestamp": "11:00:19", "id": "u", "action": "INCREASE", "amount": "40"}
 {"timestamp": "18:09:57", "id": "user", "action": "INCREASE", "amount": "10"}
 {"timestamp": "18:10:47", "id": "user", "action": "DECREASE", "amount": "9"}
+{"timestamp": "12:16:27", "id": "user", "action": "INCREASE", "amount": "10"}
+{"timestamp": "12:17:51", "id": "user", "action": "INCREASE", "amount": "7"}
