@@ -188,23 +188,11 @@ public class Client {
         return amount;
     }
 
-    private static boolean isValidClientId(String clientId) {
-        return clientId != null && clientId.matches("^[a-zA-Z0-9_-]{3,20}$"); // Allow letters, numbers, _ and -, 3-20 characters
-    }
-    
-    private static boolean isValidPassword(String password) {
-        if (password == null || password.length() < 8 || password.length() > 30) {
-            return false; // Length requirement
-        }
-        // Regular expression to check at least one special character and two digits
-        String specialCharAndDigitRegex = "^(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?])(?=.*\\d.*\\d).+$";
-        return password.matches(specialCharAndDigitRegex);
-    }
 
     private static String getValidatedClientId(Scanner scanner) {
         while (true) {
             System.out.print("Enter client ID: ");
-            String clientId = scanner.nextLine();
+            String clientId = scanner.next();
             //IDs must be 3-20 characters, alphanumeric, '_', or '-'
             if (clientId != null && clientId.matches("^[a-zA-Z0-9_-]{3,20}$")) {
                 return clientId;
