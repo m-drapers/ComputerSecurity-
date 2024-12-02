@@ -5,13 +5,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Server {
     private ServerSocket serverSocket;
-    private Map<String, ClientInfo> clients = new HashMap<>();
+    private Map<String, ClientInfo> clients = new ConcurrentHashMap<>();
     private static final DateTimeFormatter Formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     public void start(int port) {
@@ -260,4 +260,3 @@ public class Server {
         server.start(5001);
     }
 }
-
