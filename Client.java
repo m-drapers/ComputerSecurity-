@@ -1,5 +1,5 @@
-import java.net.*;
 import java.io.*;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -166,6 +166,71 @@ public class Client {
         System.out.println(response);
     }
     
+    private static int getValidatedInput(Scanner inputScanner, String action) {
+        int amount = -1;
+        boolean valid = false;
+    
+        while (!valid) {
+            System.out.print("Enter amount to " + action + ": ");
+            if (inputScanner.hasNextInt()) {
+                amount = inputScanner.nextInt();
+                if (amount > 0 && amount <= Integer.MAX_VALUE) {
+                    valid = true; 
+                } else {
+                    System.out.println("ERROR: Invalid input.");
+                }
+            } else { //this happen if input in not an interger
+                System.out.println("ERROR: Invalid input.");
+                inputScanner.next(); // Clear invalid input
+            }
+        }
+        inputScanner.nextLine(); 
+        return amount;
+    }
+
+    private static boolean isValidClientId(String clientId) {
+        return clientId != null && clientId.matches("^[a-zA-Z0-9_-]{3,20}$"); // Allow letters, numbers, _ and -, 3-20 characters
+    }
+    
+    private static boolean isValidPassword(String password) {
+        if (password == null || password.length() < 8 || password.length() > 30) {
+            return false; // Length requirement
+        }
+        // Regular expression to check at least one special character and two digits
+        String specialCharAndDigitRegex = "^(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?])(?=.*\\d.*\\d).+$";
+        return password.matches(specialCharAndDigitRegex);
+    }
+
+    private static String getValidatedClientId(Scanner scanner) {
+        while (true) {
+            System.out.print("Enter client ID: ");
+            String clientId = scanner.nextLine();
+            //IDs must be 3-20 characters, alphanumeric, '_', or '-'
+            if (clientId != null && clientId.matches("^[a-zA-Z0-9_-]{3,20}$")) {
+                return clientId;
+            } else {
+                System.out.println("ERROR: Invalid client ID");
+            }
+        }
+    }
+    
+    private static String getValidatedPassword() {
+        Console console = System.console();
+        while (true) {
+            System.out.print("Enter password: ");
+            char[] passwordArray = console.readPassword();
+            String password = new String(passwordArray);
+            //Passwords must be 8-30 characters, at least one special character, at least two digits
+            if (password != null && password.matches("^(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?])(?=.*\\d.*\\d).+$")) {
+                return password;
+            } else {
+                System.out.println("ERROR: Invalid password");
+            }
+        }
+    }
+    
+    
+    
 
     public static void main(String[] args) {
         Scanner inputScanner = new Scanner(System.in);
@@ -183,17 +248,8 @@ public class Client {
         System.out.print("Enter port number: ");
         int port = inputScanner.nextInt();
 
-        // Get client ID from user
-        inputScanner.nextLine(); // Consume newline
-        System.out.print("Enter client ID: ");
-        String clientId = inputScanner.nextLine();
-
-        // Get password from user (hidden input)
-        Console console = System.console();
-        String password;
-        System.out.print("Enter password: ");
-        char[] passwordArray = console.readPassword();
-        password = new String(passwordArray);
+        String clientId = getValidatedClientId(inputScanner);
+        String password = getValidatedPassword();
 
         // Create client with user-provided IP and port
         Client client = new Client();
@@ -212,23 +268,16 @@ public class Client {
             command = inputScanner.nextLine().toUpperCase();
 
             switch (command) {
-                case "INCREASE":
-                    System.out.print("Enter amount to increase: ");
-                    int increaseAmount = inputScanner.nextInt();
-                    inputScanner.nextLine(); // Consume newline
+                case "INCREASE" -> {
+                    int increaseAmount = getValidatedInput(inputScanner, "increase");
                     client.sendIncrease(increaseAmount);
-                    break;
-                case "DECREASE":
-                    System.out.print("Enter amount to decrease: ");
-                    int decreaseAmount = inputScanner.nextInt();
-                    inputScanner.nextLine(); // Consume newline
+                }
+                case "DECREASE" -> {
+                    int decreaseAmount = getValidatedInput(inputScanner, "decrease");
                     client.sendDecrease(decreaseAmount);
-                    break;
-                case "LOGOUT":
-                    client.sendLogout();
-                    break;
-                default:
-                    System.out.println("Unknown command. Try again.");
+                }
+                case "LOGOUT" -> client.sendLogout();
+                default -> System.out.println("Unknown command. Try again.");
             }
         } while (!command.equals("LOGOUT"));
 

@@ -1,18 +1,13 @@
-import java.net.*;
 import java.io.*;
-
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Scanner;
-
-
-import java.time.*;
-import java.time.format.DateTimeFormatter;
-import java.nio.*;
+import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class Server {
     private ServerSocket serverSocket;
@@ -133,12 +128,19 @@ public class Server {
                 out.println("ERROR: Client not registered.");
                 return;
             }
-    
-            int amount = Integer.parseInt(parts[1]);
-            if (amount < 0) {
-                throw new IllegalArgumentException("Amount cannot be negative");
+            int amount;
+            //check for strings
+            try{
+            amount = Integer.parseInt(parts[1]);
+            }catch (NumberFormatException e) {
+                out.println("ERROR: Invalid format.");
+                return;
             }
-   
+            //check for overflow + no negative numbeers
+            if (amount < 0 || amount > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException("Invalid Amount");
+            }
+
             ClientInfo clientInfo = clients.get(clientId);
             String filePath = clientInfo.id + ".json";
             if (command.equals("INCREASE")) {
