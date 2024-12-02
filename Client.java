@@ -253,7 +253,7 @@ public class Client {
         String command;
         do {
             System.out.println("Enter command (INCREASE, DECREASE, LOGOUT): ");
-            command = inputScanner.nextLine().toUpperCase();
+            command = inputScanner.next().toUpperCase();
 
             switch (command) {
                 case "INCREASE" -> {
