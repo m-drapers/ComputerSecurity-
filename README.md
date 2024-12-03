@@ -1,4 +1,4 @@
-# Computer Security-Build It Phase
+# Computer Security
 this client-server application facilitates a basic command protocol between a client and a server, allowing users to register, manipulate a counter (increase/decrease), and log out. The server maintains a simple client database in memory and generates logs of actions. JSON files store client-specific actions and server logs.
 
 ---
