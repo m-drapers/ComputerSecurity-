@@ -8,6 +8,7 @@ import java.util.Scanner;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 
+import javax.crypto.SecretKey;
 import javax.net.ssl.*;
 
 public class Client {
@@ -73,7 +74,7 @@ public class Client {
             }
         }
     
-    private static void clientCreation(String clientId, String password, String ip,  int port, Scanner inputScanner, Client client){
+    private static void clientCreation(String clientId, String password, String ip,  int port, Scanner inputScanner, Client client) throws Exception {
         String clientFile = clientId + ".json" ;
 
         // Check if the file already exists
@@ -85,23 +86,41 @@ public class Client {
             try (BufferedReader fileReader = new BufferedReader(new FileReader(clientFile))) {
                 String line;
                 String storedPassword = null;
+                String encryptionKey = null;
 
                 while ((line = fileReader.readLine()) != null) {
                     line = line.trim();  // Remove leading/trailing spaces
                     if (line.startsWith("\"password\":")) {
                         storedPassword = line.split(":")[1].trim();
                         storedPassword = storedPassword.replace("\"", "").replace(",", "");
+                    }else if (line.startsWith("\"encryptionKey\":")) {
+                        encryptionKey = line.split(":")[1].trim().replace("\"", "").replace(",", "");
+                        //System.out.println("Encryption key: " + encryptionKey);
                         break;
                     }
                 }
+                System.out.println("Stored password: " + storedPassword);
+                System.out.println("Encryption key: " + encryptionKey);
+
 
                 // Compare the stored password with the given one
-                if (storedPassword == null || !storedPassword.equals(password)) {
-                    System.out.println("ERROR: Password does not match the one in the file. Terminating connection.");
+                if (storedPassword == null || encryptionKey == null) {
+                    System.out.println("ERROR: Invalid client file. Missing password or encryption key.");
                     inputScanner.close();
                     client.stopConnection();
                     System.exit(0);
-                    return; 
+                    return;
+                }
+
+
+                SecretKey secretKey = CryptoUtils.loadKey(encryptionKey);
+                String decryptedPassword = CryptoUtils.decrypt(storedPassword, secretKey);
+
+                if (!decryptedPassword.equals(password)) {
+                    System.out.println("ERROR: Password mismatch. Connection terminated.");
+                    inputScanner.close();
+                    client.stopConnection();
+                    System.exit(0);
                 } else {
                     System.out.println("Password matches. Proceeding with further steps.");
                 }
@@ -109,41 +128,100 @@ public class Client {
             } catch (IOException e) {
                 System.err.println("Error reading client file: " + e.getMessage());
                 return;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
-            return; // Exit the method if file exists and password mismatch occurs
-        }
+            //return;
+            String encryptedPassword ;
+            String keyAsString ;
+            try{
 
+                SecretKey secretKey = CryptoUtils.generateKey();
+                encryptedPassword = CryptoUtils.encrypt(password, secretKey);
+                keyAsString = CryptoUtils.saveKey(secretKey);
+
+            } catch (Exception e) {
+                System.err.println("Error cryptoutils " + e.getMessage());
+                throw new RuntimeException(e);
+            }
+
+
+            Map<String, Object> newClient = new LinkedHashMap<>();
+            newClient.put("id", clientId);
+            newClient.put("password", encryptedPassword);
+            newClient.put("encryptionKey", keyAsString);
+
+            Map<String, Object> server = new LinkedHashMap<>();
+            server.put("ip", ip);
+            server.put("port", port);
+            newClient.put("server", server);
+
+            int delay = (int) (Math.random() * 121); // Generates a random integer from 0 to 120
+
+            Map<String, Object> action = new LinkedHashMap<>();
+            action.put("delay", delay );
+            action.put("steps", new ArrayList<>()); // Empty array
+            newClient.put("actions", action);
+            String jsonBuilder = mapToJsonString(newClient, 0);
+            // write JSON string to individual file
+            try (FileWriter fileWriter = new FileWriter(clientFile)) {
+                fileWriter.write(jsonBuilder + "\n");
+                fileWriter.flush();
+                System.out.println("Client JSON file created: " + clientFile);
+            } catch (IOException e) {
+                System.err.println("Error writing to client file: " + e.getMessage());
+            }
+
+        }
+            /*
         Map<String, Object> newclient = new LinkedHashMap<>();
         
         // Client information
         newclient.put("id", clientId);
-        newclient.put("password", password);
+        try {
+            SecretKey secretKey = CryptoUtils.generateKey();
+            String encryptedPassword = CryptoUtils.encrypt(password, secretKey);
+            String keyAsString = CryptoUtils.saveKey(secretKey);
 
-        // Server information
-        Map<String, Object> server = new LinkedHashMap<>();
-        server.put("ip", ip);
-        server.put("port", port);
-        newclient.put("server", server);
-
-        // Action information
-        int delay = (int) (Math.random() * 121); // Generates a random integer from 0 to 120
-
-        Map<String, Object> action = new LinkedHashMap<>();
-        action.put("delay", delay );
-        action.put("steps", new ArrayList<>()); // Empty array
-        newclient.put("actions", action);
-
-        // Convert LinkedHashMap to JSON
-        String jsonBuilder = mapToJsonString(newclient, 0);
-
-        // write JSON string to individual file
-        try (FileWriter fileWriter = new FileWriter(clientFile)) {
-            fileWriter.write(jsonBuilder + "\n"); 
-            fileWriter.flush();
-            System.out.println("Client JSON file created: " + clientFile);
-        } catch (IOException e) {
-            System.err.println("Error writing to client file: " + e.getMessage());
+            newclient.put("password", encryptedPassword);
+            newclient.put("encryptionKey", keyAsString); // Store key securely
+        } catch (Exception e) {
+            System.err.println("Error encrypting password: " + e.getMessage());
+            return;
         }
+
+        try {
+            SecretKey secretKey = CryptoUtils.generateKey();
+            String encryptedPassword = CryptoUtils.encrypt(password, secretKey);
+            String keyAsString = CryptoUtils.saveKey(secretKey);
+
+            Map<String, Object> newClient = new LinkedHashMap<>();
+            newClient.put("id", clientId);
+            newClient.put("password", encryptedPassword);
+            newClient.put("encryptionKey", keyAsString);
+
+            Map<String, Object> server = new LinkedHashMap<>();
+            server.put("ip", ip);
+            server.put("port", port);
+            newClient.put("server", server);
+
+            Map<String, Object> action = new LinkedHashMap<>();
+            action.put("delay", (int) (Math.random() * 121));
+            action.put("steps", new ArrayList<>());
+            newClient.put("actions", action);
+
+            String jsonBuilder = mapToJsonString(newClient, 0);
+
+            try (FileWriter fileWriter = new FileWriter(clientFile)) {
+                fileWriter.write(jsonBuilder + "\n");
+                fileWriter.flush();
+                System.out.println("Client JSON file created: " + clientFile);
+            }
+        } catch (Exception e) {
+            System.err.println("Error creating client file: " + e.getMessage());
+        }
+
+             */
     }
 
     // Generate JSON format
@@ -250,7 +328,7 @@ public class Client {
         }
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         Scanner inputScanner = new Scanner(System.in);
 
         // Get ip from user

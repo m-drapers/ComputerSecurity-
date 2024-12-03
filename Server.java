@@ -4,6 +4,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import javax.crypto.SecretKey;
 import javax.net.ssl.*;
 import java.security.KeyStore;
 import java.security.SecureRandom;
@@ -82,12 +83,13 @@ public class Server {
     }
 
     private class ClientInfo {
+        public String encryptionKey;
         String id;
         String password;
         int counter;
         int instancesCount;
 
-        ClientInfo(String id, String password, int counter, int instancesCount) {
+        ClientInfo(String id, String password, String keyAsString, int counter, int instancesCount) {
             this.id = id;
             this.password = password;
             this.counter = counter;
@@ -106,14 +108,14 @@ public class Server {
         }
 
         public void run() {
-            
+
             try {
                 in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
 
                 String message;
                 while ((message = in.readLine()) != null) {
-                    
+
                     String[] parts = message.split(" ");
                     String command = parts[0];
 
@@ -139,7 +141,7 @@ public class Server {
             } catch (Exception e) {
                 System.err.println("Error: " + e.getMessage());
                 e.printStackTrace();
-            } 
+            }
         }
 
         private void handleRegister(PrintWriter out, String[] parts) {
@@ -147,10 +149,37 @@ public class Server {
                 out.println("ERROR: Invalid registration format.");
                 return;
             }
-        
+
             clientId = parts[1];
             String password = parts[2];
-        
+
+            try {
+                if (clients.containsKey(clientId)) {
+                    ClientInfo existingClient = clients.get(clientId);
+
+                    // Verify password
+                    SecretKey secretKey = CryptoUtils.loadKey(existingClient.encryptionKey);
+                    String decryptedPassword = CryptoUtils.decrypt(existingClient.password, secretKey);
+
+                    if (decryptedPassword.equals(password)) {
+                        existingClient.instancesCount += 1;
+                        out.println("ACK: Login successful.");
+                    } else {
+                        out.println("ERROR: Password mismatch.");
+                    }
+                } else {
+                    SecretKey secretKey = CryptoUtils.generateKey();
+                    String encryptedPassword = CryptoUtils.encrypt(password, secretKey);
+                    String keyAsString = CryptoUtils.saveKey(secretKey);
+
+                    clients.put(clientId, new ClientInfo(clientId, encryptedPassword, keyAsString, 0, 1));
+                    out.println("ACK: Registration successful.");
+                }
+            } catch (Exception e) {
+                System.err.println("Error handling registration: " + e.getMessage());
+                out.println("ERROR: Registration failed.");
+            }
+            /*
             // Check if the client ID is already registered
             if (clients.containsKey(clientId)) {
                 ClientInfo existingClient = clients.get(clientId);
@@ -167,14 +196,16 @@ public class Server {
                 clients.put(clientId, new ClientInfo(clientId, password, 0, 1));
                 out.println("ACK: Registration successful.");
             }
-        }        
+            
+             */
+        }
 
         private void handleCounterOperation(PrintWriter out, String command, String[] parts) {
             if (clientId == null) {
                 out.println("ERROR: Client not registered.");
                 return;
             }
-    
+
             int amount;
             // Check for strings
             try{
@@ -187,7 +218,7 @@ public class Server {
             if (amount < 0 || amount > Integer.MAX_VALUE) {
                 throw new IllegalArgumentException("Invalid Amount");
             }
-   
+
             ClientInfo clientInfo = clients.get(clientId);
             String filePath = clientInfo.id + ".json";
             if (command.equals("INCREASE")) {
@@ -236,8 +267,10 @@ public class Server {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-            }            
+            }
         }
+
+
 
         private void addStep(String filePath, String command, int amount) {
 
@@ -252,7 +285,7 @@ public class Server {
 
                 // Create the new command entry
                 String newStepEntry = "\"" + command + " " + amount + "\"";
-                
+
                 // Insert the new step command
                 boolean isArrayEmpty = jsonContent.substring(stepsIndex + 10, stepsEndIndex).trim().isEmpty();
                 String updatedStepsArray;
@@ -260,11 +293,11 @@ public class Server {
                     updatedStepsArray = jsonContent.substring(0, stepsEndIndex) + newStepEntry + jsonContent.substring(stepsEndIndex);
                 } else {
                     updatedStepsArray = jsonContent.substring(0, stepsEndIndex) + ", " + newStepEntry + jsonContent.substring(stepsEndIndex);
-                } 
+                }
 
                 // Update JSON file
                 try (FileWriter fileWriter = new FileWriter(filePath)) {
-                    fileWriter.write(updatedStepsArray); 
+                    fileWriter.write(updatedStepsArray);
                     fileWriter.flush();
                 }
 
@@ -296,6 +329,7 @@ public class Server {
         }
 
     }
+
 
     // Method to convert a Map to JSON-like string
     public static String mapToJsonString(Map<String, Object> map) {
