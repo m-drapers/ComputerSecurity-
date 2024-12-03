@@ -15,29 +15,13 @@ public class Client {
     private PrintWriter out;
     private BufferedReader in;
 
-    // Method to load environment variables from .env file
-    public static void loadEnv() {
-        try (BufferedReader br = new BufferedReader(new FileReader(".env"))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                String[] parts = line.split("=", 2);
-                if (parts.length == 2 && parts[0].startsWith("CLIENT_")) {
-                    // Set the property in the system
-                    System.setProperty(parts[0], parts[1]);
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 
-
-    public void startConnection(String ip, int port) {
+    public void startConnection(String ip, int port, String truststore_password) {
         try {       
             // Load the client truststore
             KeyStore trustStore = KeyStore.getInstance("JKS");
             try (FileInputStream trustStoreStream = new FileInputStream("client.truststore")) {
-                char[] trustStorePassword = System.getProperty("CLIENT_TRUSTSTORE_PASSWORD").toCharArray();
+                char[] trustStorePassword = truststore_password.toCharArray();
                 trustStore.load(trustStoreStream, trustStorePassword);
             }
 
@@ -241,7 +225,7 @@ public class Client {
     private static String getValidatedClientId(Scanner scanner) {
         while (true) {
             System.out.print("Enter client ID: ");
-            String clientId = scanner.nextLine();
+            String clientId = scanner.next();
             // IDs must be 3-20 characters, alphanumeric, '_', or '-'
             if (clientId != null && clientId.matches("^[a-zA-Z0-9_-]{3,20}$")) {
                 return clientId;
@@ -267,9 +251,6 @@ public class Client {
     }
 
     public static void main(String[] args) {
-        // Load environment variables from .env file
-        loadEnv();
-
         Scanner inputScanner = new Scanner(System.in);
 
         // Get ip from user
@@ -292,7 +273,12 @@ public class Client {
         // Create client with user-provided IP and port
         Client client = new Client();
 
-        client.startConnection(ip,port);
+        System.out.print("Enter your truststore password: ");
+        Console console = System.console();
+        char[] truststore_passwordArray = console.readPassword();
+        String truststore_password = new String(truststore_passwordArray);
+
+        client.startConnection(ip, port, truststore_password);
         clientCreation(clientId, password, ip, port, inputScanner, client);
         
         // Register the client

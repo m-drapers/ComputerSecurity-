@@ -25,7 +25,7 @@ this client-server application facilitates a basic command protocol between a cl
 
    Run the following command to import the server's certificate into the client's truststore.
    ```bash 
-   keytool -import -alias server -file servercert.crt -keystore client.truststore -storepass YOUR_PASSWORD
+   keytool -import -alias server -file server.crt -keystore client.truststore -storepass YOUR_PASSWORD
    ```
 
 2. **Compile the Java Classes**:
