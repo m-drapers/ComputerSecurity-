@@ -21,6 +21,7 @@ this client-server application facilitates a basic command protocol between a cl
 ### Installation
 
 1. **Import server certificate into a newly created client trustore**
+
    Each client needs to create its own truststore, which acts as a repository of certificates the client trust. 
 
    Run the following command to import the server's certificate into the client's truststore.
@@ -28,19 +29,19 @@ this client-server application facilitates a basic command protocol between a cl
    keytool -import -alias server -file server.crt -keystore client.truststore -storepass YOUR_PASSWORD
    ```
 
-2. **Compile the Java Classes**:
+3. **Compile the Java Classes**:
    ```bash
    javac Client.java Server.java
    ```
 
-3. **Run the Server**:
+4. **Run the Server**:
    Open a terminal and run:
    ```bash
    java Server
    ```
    By default, the server listens on port 5001.
 
-4. **Run the Client**:
+5. **Run the Client**:
    Open a new terminal and run:
    ```bash
    java Client
