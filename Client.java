@@ -1,24 +1,52 @@
-import java.io.*;
 import java.net.*;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Scanner;
+
+import java.security.KeyStore;
+import java.security.SecureRandom;
+
+import javax.net.ssl.*;
 
 public class Client {
     private Socket clientSocket;
     private PrintWriter out;
     private BufferedReader in;
 
-    public void startConnection(String ip, int port) {
-        try {          
-            clientSocket = new Socket(ip, port);
+
+    public void startConnection(String ip, int port, String truststore_password) {
+        try {       
+            // Load the client truststore
+            KeyStore trustStore = KeyStore.getInstance("JKS");
+            try (FileInputStream trustStoreStream = new FileInputStream("client.truststore")) {
+                char[] trustStorePassword = truststore_password.toCharArray();
+                trustStore.load(trustStoreStream, trustStorePassword);
+            }
+
+            // Create trust manager
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("SunX509");
+            trustManagerFactory.init(trustStore);
+
+            // Initialize SSL context
+            SSLContext sslContext = SSLContext.getInstance("TLSv1.3");
+            sslContext.init(null, trustManagerFactory.getTrustManagers(), new SecureRandom());
+
+            // Create SSL client socket   
+            SSLSocketFactory socketFactory = sslContext.getSocketFactory();
+            SSLSocket clientSocket = (SSLSocket) socketFactory.createSocket(ip, port);
+            
             out = new PrintWriter(clientSocket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            
         } catch (UnknownHostException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+            stopConnection(); // Close resources if setup fails
         }
     }
 
@@ -40,6 +68,8 @@ public class Client {
                 if (clientSocket != null) clientSocket.close();
             } catch (IOException e) {
                 e.printStackTrace();
+            } finally {
+                System.clearProperty("CLIENT_TRUSTORE_PASSWORD");
             }
         }
     
@@ -161,9 +191,13 @@ public class Client {
     }
 
     public void sendLogout() {
-        System.out.println("Sending LOGOUT command.");
-        String response = sendMessage("LOGOUT");
-        System.out.println(response);
+        try{
+            System.out.println("Sending LOGOUT command.");
+            String response = sendMessage("LOGOUT");
+            System.out.println(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }        
     }
     
     private static int getValidatedInput(Scanner inputScanner, String action) {
@@ -187,13 +221,12 @@ public class Client {
         inputScanner.nextLine(); 
         return amount;
     }
-
-
+    
     private static String getValidatedClientId(Scanner scanner) {
         while (true) {
             System.out.print("Enter client ID: ");
             String clientId = scanner.next();
-            //IDs must be 3-20 characters, alphanumeric, '_', or '-'
+            // IDs must be 3-20 characters, alphanumeric, '_', or '-'
             if (clientId != null && clientId.matches("^[a-zA-Z0-9_-]{3,20}$")) {
                 return clientId;
             } else {
@@ -216,9 +249,6 @@ public class Client {
             }
         }
     }
-    
-    
-    
 
     public static void main(String[] args) {
         Scanner inputScanner = new Scanner(System.in);
@@ -236,24 +266,36 @@ public class Client {
         System.out.print("Enter port number: ");
         int port = inputScanner.nextInt();
 
+        // Get client ID an dpassword from user
         String clientId = getValidatedClientId(inputScanner);
         String password = getValidatedPassword();
 
         // Create client with user-provided IP and port
         Client client = new Client();
 
-        client.startConnection(ip,port);
+        System.out.print("Enter your truststore password: ");
+        Console console = System.console();
+        char[] truststore_passwordArray = console.readPassword();
+        String truststore_password = new String(truststore_passwordArray);
+
+        client.startConnection(ip, port, truststore_password);
         clientCreation(clientId, password, ip, port, inputScanner, client);
         
-
         // Register the client
         String response = client.sendMessage("REGISTER " + clientId + " " + password);
         System.out.println(response);
+        if (!response.startsWith("ACK")) {
+            System.out.println("Server error during registration: " + response);
+            inputScanner.close();
+            client.stopConnection();
+            System.exit(1);
+        }
 
         String command;
         do {
             System.out.println("Enter command (INCREASE, DECREASE, LOGOUT): ");
-            command = inputScanner.next().toUpperCase();
+
+            command = inputScanner.hasNextLine() ? inputScanner.next().toUpperCase() : "LOGOUT";
 
             switch (command) {
                 case "INCREASE" -> {

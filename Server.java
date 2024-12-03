@@ -1,26 +1,71 @@
 import java.io.*;
-import java.net.*;
+import java.net.SocketException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import javax.net.ssl.*;
+import java.security.KeyStore;
+import java.security.SecureRandom;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.*;
-import java.time.format.DateTimeFormatter;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class Server {
-    private ServerSocket serverSocket;
+    private SSLServerSocket serverSocket;
     private Map<String, ClientInfo> clients = new ConcurrentHashMap<>();
     private static final DateTimeFormatter Formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
 
+        // Method to load environment variables from .env file
+        public static void loadEnv() {
+            try (BufferedReader br = new BufferedReader(new FileReader(".env"))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    String[] parts = line.split("=", 2);
+                    if (parts.length == 2 && parts[0].startsWith("SERVER_")) {
+                        // Set the property in the system
+                        System.setProperty(parts[0], parts[1]);
+
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
     public void start(int port) {
         try {
-            serverSocket = new ServerSocket(port);
+            // Load the server keystore
+            KeyStore keyStore = KeyStore.getInstance("JKS");
+            try (FileInputStream keyStoreStream = new FileInputStream("server.keystore")) {
+                char[] keyStorePassword = System.getProperty("SERVER_KEYSTORE_PASSWORD").toCharArray();
+                keyStore.load(keyStoreStream, keyStorePassword);
+            }
+
+            // Create key manager
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
+            char[] trustStorePassword = System.getProperty("SERVER_TRUSTSTORE_PASSWORD").toCharArray();
+            keyManagerFactory.init(keyStore, trustStorePassword);
+
+            // Initialize SSL context
+            SSLContext sslContext = SSLContext.getInstance("TLSv1.3");
+            sslContext.init(keyManagerFactory.getKeyManagers(), null, new SecureRandom());
+
+            // Create SSL server socket
+            SSLServerSocketFactory ServerSocketFactory = sslContext.getServerSocketFactory();
+            SSLServerSocket serverSocket = (SSLServerSocket) ServerSocketFactory.createServerSocket(port);
+    
             System.out.println("Server started on port " + port);
-            while (true)
-                new ClientHandler(serverSocket.accept()).start();
+            
+            while (true){
+                SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
+                new ClientHandler(clientSocket).start();
+            }
         } catch (IOException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -30,6 +75,9 @@ public class Server {
             serverSocket.close();
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            System.clearProperty("SERVER_TRUSTORE_PASSWORD");
+            System.clearProperty("SERVER_KEYSTORE_PASSWORD");
         }
     }
 
@@ -48,12 +96,12 @@ public class Server {
     }
 
     private class ClientHandler extends Thread {
-        private Socket clientSocket;
+        private SSLSocket clientSocket;
         private PrintWriter out;
         private BufferedReader in;
         private String clientId;
 
-        public ClientHandler(Socket socket) {
+        public ClientHandler(SSLSocket socket) {
             this.clientSocket = socket;
         }
 
@@ -64,7 +112,8 @@ public class Server {
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
 
                 String message;
-                while ((message = in.readLine()) != "LOGOUT") {
+                while ((message = in.readLine()) != null) {
+                    
                     String[] parts = message.split(" ");
                     String command = parts[0];
 
@@ -78,22 +127,19 @@ public class Server {
                             break;
                         case "LOGOUT":
                             handleLogout(out);
-                            break;
+                            return;
                         default:
                             out.println("ERROR: Unknown command.");
                             break;
                     }
                 }
-            } catch (IOException e) {
+            } catch (SocketException e) {
+                System.err.println("Client disconnected abruptly: " + clientId);
+                handleLogout(out); // Treat as  a "LOGOUT" command
+            } catch (Exception e) {
+                System.err.println("Error: " + e.getMessage());
                 e.printStackTrace();
-            } finally {
-                handleLogout(out);
-                try {
-                    clientSocket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
+            } 
         }
 
         private void handleRegister(PrintWriter out, String[] parts) {
@@ -128,19 +174,20 @@ public class Server {
                 out.println("ERROR: Client not registered.");
                 return;
             }
+    
             int amount;
-            //check for strings
+            // Check for strings
             try{
-            amount = Integer.parseInt(parts[1]);
-            }catch (NumberFormatException e) {
+                amount = Integer.parseInt(parts[1]);
+            } catch (NumberFormatException e) {
                 out.println("ERROR: Invalid format.");
                 return;
             }
-            //check for overflow + no negative numbeers
+            // Check for overflow + no negative numbeers
             if (amount < 0 || amount > Integer.MAX_VALUE) {
                 throw new IllegalArgumentException("Invalid Amount");
             }
-
+   
             ClientInfo clientInfo = clients.get(clientId);
             String filePath = clientInfo.id + ".json";
             if (command.equals("INCREASE")) {
@@ -157,6 +204,7 @@ public class Server {
 
         private void handleLogout(PrintWriter out) {
             String filePath = clients.get(clientId).id + ".json";
+
             if (clientId != null) {
                 ClientInfo clientInfo = clients.get(clientId);
 
@@ -166,6 +214,7 @@ public class Server {
                     if (clientInfo.instancesCount <= 0) {
                         // If no more instances, remove from clients map and delete JSON file
                         clients.remove(clientId);
+                        System.out.println("Client information deleted");
                         try {
                             // Delete the client's JSON file
                             Path path = Paths.get(filePath);
@@ -181,11 +230,16 @@ public class Server {
                     }
                 }
                 clientId = null;
+                try {
+                    in.close();
+                    clientSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }            
         }
 
         private void addStep(String filePath, String command, int amount) {
-            // String filePath = clients.get(clientId).id + ".json";
 
             try {
                 // Read the content of the JSON file
@@ -256,6 +310,9 @@ public class Server {
     }
 
     public static void main(String args[]) {
+        // Load environment variables from .env file
+        loadEnv();
+        
         Server server = new Server();
         server.start(5001);
     }
