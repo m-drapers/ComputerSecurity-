@@ -309,7 +309,7 @@ public class Client {
         do {
             System.out.println("Enter command (INCREASE, DECREASE, LOGOUT): ");
 
-            command = inputScanner.hasNextLine() ? inputScanner.nextLine().toUpperCase() : "LOGOUT";
+            command = inputScanner.hasNextLine() ? inputScanner.next().toUpperCase() : "LOGOUT";
 
             switch (command) {
                 case "INCREASE" -> {
