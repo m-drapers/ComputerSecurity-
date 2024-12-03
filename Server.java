@@ -27,6 +27,7 @@ public class Server {
                     if (parts.length == 2 && parts[0].startsWith("SERVER_")) {
                         // Set the property in the system
                         System.setProperty(parts[0], parts[1]);
+
                     }
                 }
             } catch (IOException e) {
@@ -39,13 +40,13 @@ public class Server {
             // Load the server keystore
             KeyStore keyStore = KeyStore.getInstance("JKS");
             try (FileInputStream keyStoreStream = new FileInputStream("server.keystore")) {
-                char[] keyStorePassword = System.getenv("SERVER_KEYSTORE_PASSWORD").toCharArray();
+                char[] keyStorePassword = System.getProperty("SERVER_KEYSTORE_PASSWORD").toCharArray();
                 keyStore.load(keyStoreStream, keyStorePassword);
             }
 
             // Create key manager
             KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
-            char[] trustStorePassword = System.getenv("SERVER_TRUSTSTORE_PASSWORD").toCharArray();
+            char[] trustStorePassword = System.getProperty("SERVER_TRUSTSTORE_PASSWORD").toCharArray();
             keyManagerFactory.init(keyStore, trustStorePassword);
 
             // Initialize SSL context
