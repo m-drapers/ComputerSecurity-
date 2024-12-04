@@ -86,12 +86,14 @@ public class Server {
         String password;
         int counter;
         int instancesCount;
+        String salt;
 
-        ClientInfo(String id, String password, int counter, int instancesCount) {
+        ClientInfo(String id, String password, int counter, int instancesCount, String salt) {
             this.id = id;
             this.password = password;
             this.counter = counter;
             this.instancesCount = 1;
+            this.salt = salt;
         }
     }
 
@@ -156,15 +158,21 @@ public class Server {
                 ClientInfo existingClient = clients.get(clientId);
         
                 // Verify if the password matches
-                if (existingClient.password.equals(password)) {
+                if (PasswordUtils.verifyPassword(password, existingClient.password, existingClient.salt)){
                     existingClient.instancesCount += 1;
                     out.println("ACK: Login successful.");
                 } else {
                     System.out.println("ERROR: ID already in use with a different password.");
                 }
             } else {
-                // Register new client if ID is not in use
-                clients.put(clientId, new ClientInfo(clientId, password, 0, 1));
+                // Generate a salt for this user
+                String salt = PasswordUtils.generateSalt();
+
+                // Hash the password with the salt
+                String hashedPassword = PasswordUtils.hashPassword(password, salt);
+
+                // Store hashed password and salt
+                clients.put(clientId, new ClientInfo(clientId, hashedPassword, 0, 1, salt));
                 out.println("ACK: Registration successful.");
             }
         }        
