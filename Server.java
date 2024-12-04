@@ -1,17 +1,16 @@
 import java.io.*;
 import java.net.SocketException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
-import javax.net.ssl.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import javax.net.ssl.*;
 
 public class Server {
     private SSLServerSocket serverSocket;
@@ -86,14 +85,12 @@ public class Server {
         String password;
         int counter;
         int instancesCount;
-        String salt;
 
-        ClientInfo(String id, String password, int counter, int instancesCount, String salt) {
+        ClientInfo(String id, String password, int counter, int instancesCount) {
             this.id = id;
             this.password = password;
             this.counter = counter;
             this.instancesCount = 1;
-            this.salt = salt;
         }
     }
 
@@ -155,24 +152,19 @@ public class Server {
         
             // Check if the client ID is already registered
             if (clients.containsKey(clientId)) {
+                
                 ClientInfo existingClient = clients.get(clientId);
         
                 // Verify if the password matches
-                if (PasswordUtils.verifyPassword(password, existingClient.password, existingClient.salt)){
+                if (existingClient.password.equals(password)) {
                     existingClient.instancesCount += 1;
                     out.println("ACK: Login successful.");
                 } else {
                     System.out.println("ERROR: ID already in use with a different password.");
                 }
             } else {
-                // Generate a salt for this user
-                String salt = PasswordUtils.generateSalt();
-
-                // Hash the password with the salt
-                String hashedPassword = PasswordUtils.hashPassword(password, salt);
-
-                // Store hashed password and salt
-                clients.put(clientId, new ClientInfo(clientId, hashedPassword, 0, 1, salt));
+                // Register new client if ID is not in use
+                clients.put(clientId, new ClientInfo(clientId, password, 0, 1));
                 out.println("ACK: Registration successful.");
             }
         }        

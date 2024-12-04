@@ -1,13 +1,14 @@
-import java.net.*;
 import java.io.*;
+import java.net.*;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Scanner;
-
-import java.security.KeyStore;
-import java.security.SecureRandom;
-
 import javax.net.ssl.*;
 
 public class Client {
@@ -73,6 +74,23 @@ public class Client {
             }
         }
     
+        private static String hashPassword(String password) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] encodedHash = digest.digest(password.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder(2 * encodedHash.length);
+            for (byte b : encodedHash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Error hashing password", e);
+        }
+    }
     private static void clientCreation(String clientId, String password, String ip,  int port, Scanner inputScanner, Client client){
         String clientFile = clientId + ".json" ;
 
@@ -269,6 +287,7 @@ public class Client {
         // Get client ID an dpassword from user
         String clientId = getValidatedClientId(inputScanner);
         String password = getValidatedPassword();
+        password = hashPassword(password); // Hash the password
 
         // Create client with user-provided IP and port
         Client client = new Client();
