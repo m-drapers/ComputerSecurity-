@@ -23,7 +23,7 @@ public class Server {
         public static void loadEnv() {
             try (BufferedReader br = new BufferedReader(new FileReader(".env"))) {
                 String line;
-                while ((line = br.readLine()) != null) {
+                while (!((line = br.readLine()).equals(null))) {
                     String[] parts = line.split("=", 2);
                     if (parts.length == 2 && parts[0].startsWith("SERVER_")) {
                         // Set the property in the system
@@ -120,7 +120,7 @@ public class Server {
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
 
                 String message;
-                while ((message = in.readLine()) != "LOGOUT"){
+                while ((message = in.readLine()).equals( "LOGOUT")){
                     
                     String[] parts = message.split(" ");
                     String command = parts[0];

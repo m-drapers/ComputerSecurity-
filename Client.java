@@ -122,7 +122,7 @@ public class Client {
             System.out.print("Enter client ID: ");
             String clientId = scanner.next();
             // IDs must be 3-20 characters, alphanumeric, '_', or '-'
-            if (clientId != null && clientId.matches("^[a-zA-Z0-9_-]{3,20}$")) {
+            if (!(clientId.equals(null)) && clientId.matches("^[a-zA-Z0-9_-]{3,20}$")) {
                 return clientId;
             } else {
                 System.out.println("ERROR: Invalid client ID");
@@ -137,7 +137,7 @@ public class Client {
             char[] passwordArray = console.readPassword();
             String password = new String(passwordArray);
             //Passwords must be 8-30 characters, at least one special character, at least two digits
-            if (password != null && password.matches("^(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?])(?=.*\\d.*\\d).+$")) {
+            if (!(password.equals(null)) && password.matches("^(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?])(?=.*\\d.*\\d).+$")) {
                 return password;
             } else {
                 System.out.println("ERROR: Invalid password");
