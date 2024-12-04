@@ -1,6 +1,7 @@
 import java.net.*;
 import java.io.*;
 import java.util.ArrayList;
+import java.util.InputMismatchException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Scanner;
@@ -16,9 +17,9 @@ public class Client {
             out = new PrintWriter(clientSocket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
         } catch (UnknownHostException e) {
-            e.printStackTrace();
+            System.err.println("Unable to connect to the server."); //Please check IP address
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Unable to connect to the server");
         }
     }
 
@@ -28,7 +29,7 @@ public class Client {
             out.println(msg); // Send message to the server
             resp = in.readLine(); // Read response from the server
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Unable to connect to the server");;
         }
         return resp;
     }
@@ -39,10 +40,11 @@ public class Client {
                 if (out != null) out.close();
                 if (clientSocket != null) clientSocket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                System.err.println("Error closing client connection");;
             }
         }
     
+    /* 
     private static void clientCreation(String clientId, String password, String ip,  int port, Scanner inputScanner, Client client){
         String clientFile = clientId + ".json" ;
 
@@ -77,7 +79,7 @@ public class Client {
                 }
 
             } catch (IOException e) {
-                System.err.println("Error reading client file: " + e.getMessage());
+                System.err.println("Error reading client file ");
                 return;
             }
             return; // Exit the method if file exists and password mismatch occurs
@@ -112,11 +114,11 @@ public class Client {
             fileWriter.flush();
             System.out.println("Client JSON file created: " + clientFile);
         } catch (IOException e) {
-            System.err.println("Error writing to client file: " + e.getMessage());
+            System.err.println("Error writing to client file: ");
         }
-    }
+    } */
 
-    // Generate JSON format
+    /*  Generate JSON format
     public static String mapToJsonString(Map<String, Object> map, int indentLevel) {
         StringBuilder jsonBuilder = new StringBuilder("{\n");
         String indent = "    ".repeat(indentLevel);
@@ -146,7 +148,7 @@ public class Client {
         jsonBuilder.delete(jsonBuilder.length() - 2, jsonBuilder.length());
         jsonBuilder.append("\n").append(indent).append("}");
         return jsonBuilder.toString();
-    }
+    } */
 
     public void sendIncrease(int amount) {
         System.out.println("Sending INCREASE command with amount: " + amount);
@@ -176,12 +178,24 @@ public class Client {
             InetAddress localIpAddress = InetAddress.getLocalHost();
             ip = localIpAddress.getHostAddress();
         } catch (Exception e) {
-            e.printStackTrace(); 
+           System.err.println("Error IP"); 
         }
 
         // Get port from user
-        System.out.print("Enter port number: ");
-        int port = inputScanner.nextInt();
+        int port = 0;
+        boolean validPort = false;
+        while (!validPort) {
+            System.out.print("Enter port number: ");
+            try {
+                port = inputScanner.nextInt();
+                validPort = true;  // Valid port input, exit the loop
+            } catch (InputMismatchException e) {
+                System.err.println("Invalid input. Please enter a valid integer for the port.");
+                inputScanner.nextLine(); // Clear the invalid input from the scanner buffer
+            }
+        }
+        //System.out.print("Enter port number: ");
+        //int port = inputScanner.nextInt();
 
         // Get client ID from user
         inputScanner.nextLine(); // Consume newline
@@ -199,7 +213,7 @@ public class Client {
         Client client = new Client();
 
         client.startConnection(ip,port);
-        clientCreation(clientId, password, ip, port, inputScanner, client);
+        //clientCreation(clientId, password, ip, port, inputScanner, client);
         
 
         // Register the client
@@ -213,16 +227,36 @@ public class Client {
 
             switch (command) {
                 case "INCREASE":
-                    System.out.print("Enter amount to increase: ");
-                    int increaseAmount = inputScanner.nextInt();
-                    inputScanner.nextLine(); // Consume newline
-                    client.sendIncrease(increaseAmount);
+                    boolean validIncrease = false;
+                    while(!validIncrease){
+                        System.out.print("Enter amount to increase: ");
+                        try{
+                            int increaseAmount = inputScanner.nextInt();
+                            inputScanner.nextLine(); // Consume newline
+                            client.sendIncrease(increaseAmount);
+                            validIncrease = true;
+                        }
+                        catch(InputMismatchException e){
+                            System.err.println("Invalid input.Please try again");
+                            inputScanner.nextLine();
+                        }
+                    }
                     break;
                 case "DECREASE":
-                    System.out.print("Enter amount to decrease: ");
-                    int decreaseAmount = inputScanner.nextInt();
-                    inputScanner.nextLine(); // Consume newline
-                    client.sendDecrease(decreaseAmount);
+                    boolean validDecrease = false;
+                    while(!validDecrease){
+                        try{
+                        System.out.print("Enter amount to decrease: ");
+                        int decreaseAmount = inputScanner.nextInt();
+                        inputScanner.nextLine(); // Consume newline
+                        client.sendDecrease(decreaseAmount);
+                        validDecrease = true;
+                        } 
+                        catch (InputMismatchException e){
+                            System.err.println("Invalid inout. Please try again");
+                            inputScanner.nextLine();
+                        }
+                    }
                     break;
                 case "LOGOUT":
                     client.sendLogout();

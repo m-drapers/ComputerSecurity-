@@ -26,7 +26,7 @@ public class Server {
             while (true)
                 new ClientHandler(serverSocket.accept()).start();
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Could not start the server");
         }
     }
 
@@ -34,7 +34,7 @@ public class Server {
         try {
             serverSocket.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Error while stopping the server");;
         }
     }
 
@@ -90,13 +90,13 @@ public class Server {
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                System.err.println("Error handling client communication");
             } finally {
                 handleLogout(out);
                 try {
                     clientSocket.close();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    System.err.println("Error closing client socket");;
                 }
             }
         }
@@ -143,10 +143,10 @@ public class Server {
             String filePath = clientInfo.id + ".json";
             if (command.equals("INCREASE")) {
                 clientInfo.counter += amount;
-                addStep(filePath, command, amount);
+                //addStep(filePath, command, amount); DELETE
             } else { // DECREASE
                 clientInfo.counter -= amount;
-                addStep(filePath, command, amount);
+                //addStep(filePath, command, amount); DELETE
             }
             out.println("Counter " + command.toLowerCase()+"d to " + clientInfo.counter);
 
@@ -154,34 +154,40 @@ public class Server {
         }
 
         private void handleLogout(PrintWriter out) {
-            String filePath = clients.get(clientId).id + ".json";
-            if (clientId != null) {
-                ClientInfo clientInfo = clients.get(clientId);
+            try{
+                if (clientId != null) {
+                    ClientInfo clientInfo = clients.get(clientId);
 
-                if (clientInfo != null) {
-                    clientInfo.instancesCount -= 1; // Decrement instance count
+                    if (clientInfo != null) {
+                        clientInfo.instancesCount -= 1; // Decrement instance count
 
-                    if (clientInfo.instancesCount <= 0) {
-                        // If no more instances, remove from clients map and delete JSON file
-                        clients.remove(clientId);
-                        try {
-                            // Delete the client's JSON file
-                            Path path = Paths.get(filePath);
-                            Files.delete(path);
-                            if (out != null){
-                                out.println("ACK: Logout successful.");
-                            }
-                        } catch (IOException e) {
-                            System.err.println("Failed to delete the file " + filePath + ": " + e.getMessage());
+                        if (clientInfo.instancesCount <= 0) {
+                            // If no more instances, remove from clients map and delete JSON file
+                            clients.remove(clientId);
+                            //DELETE
+                            /*try {
+                                // Delete the client's JSON file
+                                Path path = Paths.get(filePath);
+                                Files.delete(path);
+                                if (out != null){
+                                    out.println("ACK: Logout successful.");
+                                }
+                            } catch (IOException e) {
+                                System.err.println("Failed to delete the file " + filePath);
+                            } */
+                        } else {
+                            out.println("ACK: Logout successful, remaining instances: " + clientInfo.instancesCount);
                         }
-                    } else {
-                        out.println("ACK: Logout successful, remaining instances: " + clientInfo.instancesCount);
                     }
-                }
-                clientId = null;
-            }            
+                    clientId = null;
+                }   
+            }
+            catch(NullPointerException e){
+                System.err.println("Error: NullPointerException occurred during logout.");
+            }
         }
 
+        /* 
         private void addStep(String filePath, String command, int amount) {
             // String filePath = clients.get(clientId).id + ".json";
 
@@ -213,9 +219,9 @@ public class Server {
                 }
 
             } catch (IOException e) {
-                System.err.println("Error reading or writing to client file: " + e.getMessage());
+                System.err.println("Error updating client file ");
             }
-        }
+        } */
     }
 
 
@@ -236,7 +242,7 @@ public class Server {
             fileWriter.write(jsonBuilder + "\n");    
 
         } catch (IOException e) {
-            System.err.println("Error writing to log file: " + e.getMessage());
+            System.err.println("Error writing to log file ");
         }
 
     }

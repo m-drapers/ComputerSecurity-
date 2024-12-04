@@ -37,3 +37,5 @@
 {"timestamp": "23:03:28", "id": "l", "action": "INCREASE", "amount": "10"}
 {"timestamp": "23:05:21", "id": "l", "action": "DECREASE", "amount": "10"}
 {"timestamp": "23:07:20", "id": "l", "action": "INCREASE", "amount": "10"}
+{"timestamp": "10:31:47", "id": "iiii", "action": "INCREASE", "amount": "100"}
+{"timestamp": "11:06:52", "id": "333", "action": "INCREASE", "amount": "10"}
