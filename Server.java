@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -31,7 +32,7 @@ public class Server {
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                //e.printStackTrace();
             }
         }
 
@@ -63,10 +64,15 @@ public class Server {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
                 new ClientHandler(clientSocket).start();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+        } 
+        catch(UnknownHostException e){
+            System.err.println("Unable to connect to the server."); //Please check IP address
+        }
+        catch (IOException e) {
+            System.err.println("Unable to connect to the server");
         } catch (Exception e) {
-            e.printStackTrace();
+            
+            //e.printStackTrace();
         }
     }
 
@@ -74,7 +80,7 @@ public class Server {
         try {
             serverSocket.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         } finally {
             System.clearProperty("SERVER_TRUSTORE_PASSWORD");
             System.clearProperty("SERVER_KEYSTORE_PASSWORD");
@@ -114,7 +120,7 @@ public class Server {
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
 
                 String message;
-                while ((message = in.readLine()) != null) {
+                while ((message = in.readLine()) != "LOGOUT"){
                     
                     String[] parts = message.split(" ");
                     String command = parts[0];
@@ -140,7 +146,6 @@ public class Server {
                 handleLogout(out); // Treat as  a "LOGOUT" command
             } catch (Exception e) {
                 System.err.println("Error: " + e.getMessage());
-                e.printStackTrace();
             } 
         }
 
@@ -197,13 +202,13 @@ public class Server {
             }
    
             ClientInfo clientInfo = clients.get(clientId);
-            String filePath = clientInfo.id + ".json";
+            //String filePath = clientInfo.id + ".json";
             if (command.equals("INCREASE")) {
                 clientInfo.counter += amount;
-                addStep(filePath, command, amount);
+                //addStep(filePath, command, amount);
             } else { // DECREASE
                 clientInfo.counter -= amount;
-                addStep(filePath, command, amount);
+                //addStep(filePath, command, amount);
             }
             out.println("Counter " + command.toLowerCase()+"d to " + clientInfo.counter);
 
@@ -212,74 +217,34 @@ public class Server {
 
         private void handleLogout(PrintWriter out) {
             String filePath = clients.get(clientId).id + ".json";
+            try{
+                if (clientId != null) {
+                    ClientInfo clientInfo = clients.get(clientId);
 
-            if (clientId != null) {
-                ClientInfo clientInfo = clients.get(clientId);
+                    if (clientInfo != null) {
+                        clientInfo.instancesCount -= 1; // Decrement instance count
 
-                if (clientInfo != null) {
-                    clientInfo.instancesCount -= 1; // Decrement instance count
-
-                    if (clientInfo.instancesCount <= 0) {
-                        // If no more instances, remove from clients map and delete JSON file
-                        clients.remove(clientId);
-                        System.out.println("Client information deleted");
-                        try {
-                            // Delete the client's JSON file
-                            Path path = Paths.get(filePath);
-                            Files.delete(path);
-                            if (out != null){
-                                out.println("ACK: Logout successful.");
-                            }
-                        } catch (IOException e) {
-                            System.err.println("Failed to delete the file " + filePath + ": " + e.getMessage());
+                        if (clientInfo.instancesCount <= 0) {
+                            // If no more instances, remove from clients map and delete JSON file
+                            clients.remove(clientId);
+                            
+                        } else {
+                            out.println("ACK: Logout successful, remaining instances: " + clientInfo.instancesCount);
                         }
-                    } else {
-                        out.println("ACK: Logout successful, remaining instances: " + clientInfo.instancesCount);
+                    }
+                    clientId = null;
+                    try {
+                        in.close();
+                        clientSocket.close();
+                    } catch (IOException e) {
+                        //e.printStackTrace();
                     }
                 }
-                clientId = null;
-                try {
-                    in.close();
-                    clientSocket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }            
-        }
-
-        private void addStep(String filePath, String command, int amount) {
-
-            try {
-                // Read the content of the JSON file
-                String jsonContent = new String(Files.readAllBytes(Paths.get(filePath)));
-
-                // Locate "steps" section
-                int actionsIndex = jsonContent.indexOf("\"actions\"");
-                int stepsIndex = jsonContent.indexOf("\"steps\": [", actionsIndex);
-                int stepsEndIndex = jsonContent.indexOf("]", stepsIndex);
-
-                // Create the new command entry
-                String newStepEntry = "\"" + command + " " + amount + "\"";
-                
-                // Insert the new step command
-                boolean isArrayEmpty = jsonContent.substring(stepsIndex + 10, stepsEndIndex).trim().isEmpty();
-                String updatedStepsArray;
-                if (isArrayEmpty) {
-                    updatedStepsArray = jsonContent.substring(0, stepsEndIndex) + newStepEntry + jsonContent.substring(stepsEndIndex);
-                } else {
-                    updatedStepsArray = jsonContent.substring(0, stepsEndIndex) + ", " + newStepEntry + jsonContent.substring(stepsEndIndex);
-                } 
-
-                // Update JSON file
-                try (FileWriter fileWriter = new FileWriter(filePath)) {
-                    fileWriter.write(updatedStepsArray); 
-                    fileWriter.flush();
-                }
-
-            } catch (IOException e) {
-                System.err.println("Error reading or writing to client file: " + e.getMessage());
             }
-        }
+            catch(NullPointerException e){
+                System.err.println("Error: NullPointerException occurred during logout.");
+            }        
+        }   
     }
 
 
