@@ -42,11 +42,11 @@ public class Client {
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             
         } catch (UnknownHostException e) {
-            e.printStackTrace();
+            System.err.println("Unable to connect to the server."); //Please check IP address
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Unable to connect to the server");
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("Unable to connect to the server");
             stopConnection(); // Close resources if setup fails
         }
     }
@@ -57,7 +57,7 @@ public class Client {
             out.println(msg); // Send message to the server
             resp = in.readLine(); // Read response from the server
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Unable to connect to the server");;
         }
         return resp;
     }
@@ -68,7 +68,7 @@ public class Client {
                 if (out != null) out.close();
                 if (clientSocket != null) clientSocket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                System.err.println("Error closing client connection");
             } finally {
                 System.clearProperty("CLIENT_TRUSTORE_PASSWORD");
             }
@@ -214,7 +214,7 @@ public class Client {
             String response = sendMessage("LOGOUT");
             System.out.println(response);
         } catch (Exception e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         }        
     }
     
@@ -277,7 +277,7 @@ public class Client {
             InetAddress localIpAddress = InetAddress.getLocalHost();
             ip = localIpAddress.getHostAddress();
         } catch (Exception e) {
-            e.printStackTrace(); 
+            System.err.println("Error IP"); 
         }
 
         // Get port from user
@@ -298,7 +298,7 @@ public class Client {
         String truststore_password = new String(truststore_passwordArray);
 
         client.startConnection(ip, port, truststore_password);
-        clientCreation(clientId, password, ip, port, inputScanner, client);
+        
         
         // Register the client
         String response = client.sendMessage("REGISTER " + clientId + " " + password);
