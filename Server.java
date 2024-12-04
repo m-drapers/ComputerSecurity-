@@ -23,7 +23,7 @@ public class Server {
         public static void loadEnv() {
             try (BufferedReader br = new BufferedReader(new FileReader(".env"))) {
                 String line;
-                while (!((line = br.readLine()).equals(null))) {
+                while ((line = br.readLine()) != null) {
                     String[] parts = line.split("=", 2);
                     if (parts.length == 2 && parts[0].startsWith("SERVER_")) {
                         // Set the property in the system
