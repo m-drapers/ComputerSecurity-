@@ -1,6 +1,5 @@
 import java.io.*;
 import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.time.*;
@@ -28,7 +27,7 @@ public class Server {
                     }
                 }
             } catch (IOException e) {
-                //e.printStackTrace();
+                // e.printStackTrace();
             }
         }
 
@@ -60,15 +59,10 @@ public class Server {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
                 new ClientHandler(clientSocket).start();
             }
-        } 
-        catch(UnknownHostException e){
+        } catch (IOException e) {
             System.err.println("Unable to connect to the server."); //Please check IP address
-        }
-        catch (IOException e) {
-            System.err.println("Unable to connect to the server");
         } catch (Exception e) {
-            
-            //e.printStackTrace();
+            // e.printStackTrace();
         }
     }
 
@@ -76,7 +70,7 @@ public class Server {
         try {
             serverSocket.close();
         } catch (IOException e) {
-            //e.printStackTrace();
+            // e.printStackTrace();
         } finally {
             System.clearProperty("SERVER_TRUSTORE_PASSWORD");
             System.clearProperty("SERVER_KEYSTORE_PASSWORD");
@@ -114,7 +108,7 @@ public class Server {
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
 
                 String message;
-                while ((message = in.readLine()).equals( "LOGOUT")){
+                while ((message = in.readLine()) != "LOGOUT") {
                     
                     String[] parts = message.split(" ");
                     String command = parts[0];
@@ -154,7 +148,6 @@ public class Server {
         
             // Check if the client ID is already registered
             if (clients.containsKey(clientId)) {
-                
                 ClientInfo existingClient = clients.get(clientId);
         
                 // Verify if the password matches
@@ -191,13 +184,10 @@ public class Server {
             }
    
             ClientInfo clientInfo = clients.get(clientId);
-            //String filePath = clientInfo.id + ".json";
             if (command.equals("INCREASE")) {
                 clientInfo.counter += amount;
-                //addStep(filePath, command, amount);
             } else { // DECREASE
                 clientInfo.counter -= amount;
-                //addStep(filePath, command, amount);
             }
             out.println("Counter " + command.toLowerCase()+"d to " + clientInfo.counter);
 
@@ -205,36 +195,30 @@ public class Server {
         }
 
         private void handleLogout(PrintWriter out) {
-            String filePath = clients.get(clientId).id + ".json";
-            try{
-                if (clientId != null) {
-                    ClientInfo clientInfo = clients.get(clientId);
 
-                    if (clientInfo != null) {
-                        clientInfo.instancesCount -= 1; // Decrement instance count
+            if (clientId != null) {
+                ClientInfo clientInfo = clients.get(clientId);
 
-                        if (clientInfo.instancesCount <= 0) {
-                            // If no more instances, remove from clients map and delete JSON file
-                            clients.remove(clientId);
-                            
-                        } else {
-                            out.println("ACK: Logout successful, remaining instances: " + clientInfo.instancesCount);
-                        }
-                    }
-                    clientId = null;
-                    try {
-                        in.close();
-                        clientSocket.close();
-                    } catch (IOException e) {
-                        //e.printStackTrace();
+                if (clientInfo != null) {
+                    clientInfo.instancesCount -= 1; // Decrement instance count
+
+                    if (clientInfo.instancesCount <= 0) {
+                        // If no more instances, remove from clients map and delete JSON file
+                        clients.remove(clientId);
+                        System.out.println("Client information deleted");
+                    } else {
+                        out.println("ACK: Logout successful, remaining instances: " + clientInfo.instancesCount);
                     }
                 }
-            }
-            catch(NullPointerException e){
-                System.err.println("Error: NullPointerException occurred during logout.");
-            }        
-        }   
-    }
+                clientId = null;
+                try {
+                    in.close();
+                    clientSocket.close();
+                } catch (IOException e) {
+                    // e.printStackTrace();
+                }
+            }            
+        }
 
 
     private static void generatelogfile(String clientId, String action, int amount){
@@ -270,12 +254,12 @@ public class Server {
         jsonBuilder.append("}");
         return jsonBuilder.toString();
     }
-
+}
     public static void main(String args[]) {
         // Load environment variables from .env file
         loadEnv();
-        
         Server server = new Server();
         server.start(5001);
     }
+
 }
