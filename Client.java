@@ -1,12 +1,12 @@
-import java.io.*;
 import java.net.*;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.Scanner;
 import java.security.KeyStore;
+import java.security.SecureRandom;
+import javax.net.ssl.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.util.Scanner;
-import javax.net.ssl.*;
 
 public class Client {
     private Socket clientSocket;
@@ -34,7 +34,7 @@ public class Client {
             // Create SSL client socket   
             SSLSocketFactory socketFactory = sslContext.getSocketFactory();
             SSLSocket clientSocket = (SSLSocket) socketFactory.createSocket(ip, port);
-            
+
             out = new PrintWriter(clientSocket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             
@@ -69,7 +69,7 @@ public class Client {
             } finally {
                 System.clearProperty("CLIENT_TRUSTORE_PASSWORD");
             }
-        }
+    }
 
     public void sendIncrease(int amount) {
         System.out.println("Sending INCREASE command with amount: " + amount);
@@ -191,15 +191,18 @@ public class Client {
         String truststore_password = new String(truststore_passwordArray);
 
         client.startConnection(ip, port, truststore_password);
-        
+
         // Register the client
         String response = client.sendMessage("REGISTER " + clientId + " " + password);
-        System.out.println(response);
+
+        // Handle general server errors
         if (!response.startsWith("ACK")) {
             System.out.println("Server error during registration: " + response);
             inputScanner.close();
             client.stopConnection();
             System.exit(1);
+        } else {
+            System.out.println(response);
         }
 
         String command;
