@@ -1,16 +1,28 @@
 import java.io.*;
 import java.net.SocketException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import javax.net.ssl.*;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import javax.net.ssl.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+
 
 public class Server {
     private SSLServerSocket serverSocket;
+    // Solve thread vulnerability
+    private static ThreadPoolExecutor threadPool;
+    private static final int maxThreads = 10;
+
+
     private Map<String, ClientInfo> clients = new ConcurrentHashMap<>();
     private static final DateTimeFormatter Formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
 
@@ -52,15 +64,27 @@ public class Server {
             // Create SSL server socket
             SSLServerSocketFactory ServerSocketFactory = sslContext.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) ServerSocketFactory.createServerSocket(port);
+
+            // Solved thread vulnerability: Initialize the thread pool with a fixed size
+            threadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(maxThreads);
     
             System.out.println("Server started on port " + port);
             
             while (true){
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                new ClientHandler(clientSocket).start();
+                threadPool.submit(new ClientHandler(clientSocket));
+
+                if (threadPool.getActiveCount() >= maxThreads) {
+                    System.out.println("Max threads reached. Rejecting connection.");
+                    try (OutputStream os = clientSocket.getOutputStream();
+                        PrintWriter writer = new PrintWriter(os, true)) {
+                        writer.println("Server is busy. Please try again later.");
+                    }
+                    clientSocket.close(); 
+                }
             }
         } catch (IOException e) {
-            System.err.println("Unable to connect to the server."); //Please check IP address
+            System.err.println("Unable to connect to the server."); // Please check IP address
         } catch (Exception e) {
             // e.printStackTrace();
         }
@@ -69,6 +93,9 @@ public class Server {
     public void stop() {
         try {
             serverSocket.close();
+            if (threadPool != null) {
+                threadPool.shutdown();
+            }
         } catch (IOException e) {
             // e.printStackTrace();
         } finally {
@@ -76,7 +103,6 @@ public class Server {
             System.clearProperty("SERVER_KEYSTORE_PASSWORD");
         }
     }
-
     private class ClientInfo {
         String id;
         String password;
@@ -102,14 +128,31 @@ public class Server {
         }
 
         public void run() {
-            
+            AtomicReference<ScheduledExecutorService> inactivityScheduler = new AtomicReference<>(Executors.newSingleThreadScheduledExecutor());
+            ScheduledExecutorService sessionTimeoutScheduler = Executors.newSingleThreadScheduledExecutor();
             try {
                 in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
 
+                // Handle client inactivity
+                Runnable inactivityTask = () -> {
+                    out.println("Session closed due to inactivity for the client: " + clientId);
+                    handleLogout(out);
+                    try {
+                        clientSocket.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    inactivityScheduler.get().shutdown();
+                };
+
                 String message;
                 while ((message = in.readLine()) != "LOGOUT") {
-                    
+
+                    inactivityScheduler.get().shutdownNow();
+                    inactivityScheduler.set(Executors.newSingleThreadScheduledExecutor());
+                    inactivityScheduler.get().schedule(inactivityTask, 5, TimeUnit.MINUTES);
+
                     String[] parts = message.split(" ");
                     String command = parts[0];
 
@@ -123,6 +166,8 @@ public class Server {
                             break;
                         case "LOGOUT":
                             handleLogout(out);
+                            inactivityScheduler.get().shutdown();
+                            sessionTimeoutScheduler.shutdown();
                             return;
                         default:
                             out.println("ERROR: Unknown command.");
@@ -131,10 +176,19 @@ public class Server {
                 }
             } catch (SocketException e) {
                 System.err.println("Client disconnected abruptly: " + clientId);
-                handleLogout(out); // Treat as  a "LOGOUT" command
-            } catch (Exception e) {
-                System.err.println("Error: " + e.getMessage());
-            } 
+                handleLogout(out); // Treat as a "LOGOUT"
+            } catch (IOException e) {
+                System.err.println("I/O Error: " + e.getMessage());
+                // e.printStackTrace();
+            } finally {
+                try {
+                    if (clientSocket != null) clientSocket.close();
+                } catch (IOException e) {
+                    //e.printStackTrace();
+                }
+                inactivityScheduler.get().shutdown();
+                sessionTimeoutScheduler.shutdown();
+            }
         }
 
         private void handleRegister(PrintWriter out, String[] parts) {
@@ -142,18 +196,33 @@ public class Server {
                 out.println("ERROR: Invalid registration format.");
                 return;
             }
-        
+
             clientId = parts[1];
             String password = parts[2];
-        
+
             // Check if the client ID is already registered
             if (clients.containsKey(clientId)) {
                 ClientInfo existingClient = clients.get(clientId);
-        
+
                 // Verify if the password matches
                 if (existingClient.password.equals(password)) {
                     existingClient.instancesCount += 1;
-                    out.println("ACK: Login successful.");
+
+                    if (existingClient.instancesCount >= 4) {
+                        System.out.println("ERROR: Maximum concurrent logins reached for client " + clientId);
+                        out.println("Use one of your open sessions. ");
+                        clientId = null;
+                        existingClient.instancesCount -= 1; // Decrement instance count
+                        try {
+                            in.close();
+                            clientSocket.close();
+                        } catch (IOException e) {
+
+                        }
+                    } else {
+                        out.println("ACK: Login successful.");
+                    }
+
                 } else {
                     System.out.println("ERROR: ID already in use with a different password.");
                 }
@@ -162,7 +231,7 @@ public class Server {
                 clients.put(clientId, new ClientInfo(clientId, password, 0, 1));
                 out.println("ACK: Registration successful.");
             }
-        }        
+        }
 
         private void handleCounterOperation(PrintWriter out, String command, String[] parts) {
             if (clientId == null) {
@@ -206,6 +275,7 @@ public class Server {
                         // If no more instances, remove from clients map and delete JSON file
                         clients.remove(clientId);
                         System.out.println("Client information deleted");
+                        out.println("Session successfully terminated.");
                     } else {
                         out.println("ACK: Logout successful, remaining instances: " + clientInfo.instancesCount);
                     }
@@ -217,8 +287,10 @@ public class Server {
                 } catch (IOException e) {
                     // e.printStackTrace();
                 }
-            }            
+            }
         }
+
+    }
 
 
     private static void generatelogfile(String clientId, String action, int amount){
@@ -254,12 +326,11 @@ public class Server {
         jsonBuilder.append("}");
         return jsonBuilder.toString();
     }
-}
+
     public static void main(String args[]) {
         // Load environment variables from .env file
         loadEnv();
         Server server = new Server();
         server.start(5001);
     }
-
 }
