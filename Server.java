@@ -39,7 +39,7 @@ public class Server {
                     }
                 }
             } catch (IOException e) {
-                // e.printStackTrace();
+                 System.err.println("Error loading environment variables");
             }
         }
 
@@ -86,7 +86,7 @@ public class Server {
         } catch (IOException e) {
             System.err.println("Unable to connect to the server."); // Please check IP address
         } catch (Exception e) {
-            // e.printStackTrace();
+            System.err.println("Unable to connect to the server.");
         }
     }
 
@@ -97,7 +97,7 @@ public class Server {
                 threadPool.shutdown();
             }
         } catch (IOException e) {
-            // e.printStackTrace();
+            System.err.println("An error occurred while stopping the server.");
         } finally {
             System.clearProperty("SERVER_TRUSTORE_PASSWORD");
             System.clearProperty("SERVER_KEYSTORE_PASSWORD");
@@ -141,7 +141,7 @@ public class Server {
                     try {
                         clientSocket.close();
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        System.err.println("Error closing client socket due to inactivity.");
                     }
                     inactivityScheduler.get().shutdown();
                 };
@@ -178,13 +178,12 @@ public class Server {
                 System.err.println("Client disconnected abruptly: " + clientId);
                 handleLogout(out); // Treat as a "LOGOUT"
             } catch (IOException e) {
-                System.err.println("I/O Error: " + e.getMessage());
-                // e.printStackTrace();
+                System.err.println("Error occurred while handling client.");
             } finally {
                 try {
                     if (clientSocket != null) clientSocket.close();
                 } catch (IOException e) {
-                    //e.printStackTrace();
+                    System.err.println("Error closing client socket");
                 }
                 inactivityScheduler.get().shutdown();
                 sessionTimeoutScheduler.shutdown();
@@ -217,7 +216,7 @@ public class Server {
                             in.close();
                             clientSocket.close();
                         } catch (IOException e) {
-
+                            System.err.println("Error closing client socket after rejecting login.");
                         }
                     } else {
                         out.println("ACK: Login successful.");
@@ -285,7 +284,7 @@ public class Server {
                     in.close();
                     clientSocket.close();
                 } catch (IOException e) {
-                    // e.printStackTrace();
+                    System.err.println("Error closing client socket during logout.");
                 }
             }
         }
