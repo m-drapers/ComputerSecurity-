@@ -263,29 +263,34 @@ public class Server {
         }
 
         private void handleLogout(PrintWriter out) {
+            try{
+                if (clientId != null) {
+                    ClientInfo clientInfo = clients.get(clientId);
 
-            if (clientId != null) {
-                ClientInfo clientInfo = clients.get(clientId);
+                    if (clientInfo != null) {
+                        clientInfo.instancesCount -= 1; // Decrement instance count
 
-                if (clientInfo != null) {
-                    clientInfo.instancesCount -= 1; // Decrement instance count
-
-                    if (clientInfo.instancesCount <= 0) {
-                        // If no more instances, remove from clients map and delete JSON file
-                        clients.remove(clientId);
-                        System.out.println("Client information deleted");
-                        out.println("Session successfully terminated.");
-                    } else {
-                        out.println("ACK: Logout successful, remaining instances: " + clientInfo.instancesCount);
+                        if (clientInfo.instancesCount <= 0) {
+                            // If no more instances, remove from clients map and delete JSON file
+                            clients.remove(clientId);
+                            System.out.println("Client information deleted");
+                            out.println("Session successfully terminated.");
+                        } else {
+                            out.println("ACK: Logout successful, remaining instances: " + clientInfo.instancesCount);
+                        }
+                    }
+                    clientId = null;
+                    try {
+                        in.close();
+                        clientSocket.close();
+                    } catch (IOException e) {
+                        System.err.println("Error closing client socket during logout.");
                     }
                 }
-                clientId = null;
-                try {
-                    in.close();
-                    clientSocket.close();
-                } catch (IOException e) {
-                    System.err.println("Error closing client socket during logout.");
-                }
+            }
+            catch(NullPointerException e)
+            {
+                System.err.println("Error: NullPointerException occurred during logout.");
             }
         }
 
